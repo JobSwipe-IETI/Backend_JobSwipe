@@ -51,7 +51,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          mvn -B clean compile org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+          mvn -B clean compile org.sonarsource.scanner.maven:sonar-maven-plugin:5.5.0.6356:sonar \
             -DskipTests \
             -Dsonar.projectKey=JobSwipe-IETI_Backend_JobSwipe \
             -Dsonar.organization=jobswipe-ieti \
