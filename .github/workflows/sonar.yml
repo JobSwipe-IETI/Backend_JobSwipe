@@ -51,13 +51,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          mvn -B clean compile org.sonarsource.scanner.maven:sonar-maven-plugin:5.5.0.6356:sonar \
+          mvn -B clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:5.5.0.6356:sonar \
             -Dsonar.projectKey=JobSwipe-IETI_Backend_JobSwipe \
             -Dsonar.organization=jobswipe-ieti \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.sources=src/main/java \
             -Dsonar.tests=src/test/java \
             -Dsonar.java.binaries=target/classes \
+            -Dsonar.java.coverage.reportPaths=target/site/jacoco/jacoco.xml \
             -Dsonar.exclusions=**/target/**,**/logs/** \
-            -Dsonar.sourceEncoding=UTF-8 \
-            -Dsonar.coverage.exclusions=**/*
+            -Dsonar.sourceEncoding=UTF-8
