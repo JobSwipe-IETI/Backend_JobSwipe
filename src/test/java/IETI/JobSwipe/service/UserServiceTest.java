@@ -32,7 +32,6 @@ class UserServiceTest {
     private UserService userService;
 
     private User testUser;
-
     @BeforeEach
     void setUp() {
         testUser = User.builder()

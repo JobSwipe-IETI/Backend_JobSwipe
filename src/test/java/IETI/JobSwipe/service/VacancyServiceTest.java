@@ -13,6 +13,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Arrays;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -95,5 +97,68 @@ class VacancyServiceTest {
         assertEquals("Senior Developer", foundVacancy.getTitle());
         assertEquals(1L, foundVacancy.getId());
         verify(vacancyRepository, times(1)).findById(1L);
+    }
+
+    @Test
+    void shouldThrowExceptionWhenVacancyNotFound() {
+        when(vacancyRepository.findById(2L)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            vacancyService.getVacancyById(2L);
+        });
+
+        assertEquals("Vacancy not found", exception.getMessage());
+        verify(vacancyRepository, times(1)).findById(2L);
+    }
+
+    @Test
+    void shouldReturnAllVacancies() {
+        Vacancy another = Vacancy.builder()
+                .id(2L)
+                .title("Junior Developer")
+                .description("Looking for a junior developer")
+                .salary(40000.0)
+                .createdAt(LocalDateTime.now())
+                .company(testCompany)
+                .build();
+
+        when(vacancyRepository.findAll()).thenReturn(Arrays.asList(testVacancy, another));
+
+        List<Vacancy> all = vacancyService.getAllVacancies();
+
+        assertNotNull(all);
+        assertEquals(2, all.size());
+        verify(vacancyRepository, times(1)).findAll();
+    }
+
+    @Test
+    void shouldUpdateVacancy() {
+        Vacancy updates = Vacancy.builder()
+                .title("Lead Developer")
+                .description("Lead role")
+                .salary(90000.0)
+                .build();
+
+        when(vacancyRepository.findById(1L)).thenReturn(Optional.of(testVacancy));
+        when(vacancyRepository.save(any(Vacancy.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Vacancy updated = vacancyService.updateVacancy(1L, updates);
+
+        assertNotNull(updated);
+        assertEquals("Lead Developer", updated.getTitle());
+        assertEquals("Lead role", updated.getDescription());
+        assertEquals(90000.0, updated.getSalary());
+        verify(vacancyRepository, times(1)).findById(1L);
+        verify(vacancyRepository, times(1)).save(any(Vacancy.class));
+    }
+
+    @Test
+    void shouldDeleteVacancy() {
+        when(vacancyRepository.findById(1L)).thenReturn(Optional.of(testVacancy));
+
+        vacancyService.deleteVacancy(1L);
+
+        verify(vacancyRepository, times(1)).findById(1L);
+        verify(vacancyRepository, times(1)).delete(testVacancy);
     }
 }
