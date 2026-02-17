@@ -10,6 +10,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+import java.util.Arrays;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -76,5 +78,79 @@ class UserServiceTest {
 
         assertEquals("User not found", exception.getMessage());
         verify(userRepository, times(1)).findById(999L);
+    }
+
+    @Test
+    void shouldGetAllUsers() {
+        User user2 = User.builder()
+                .id(2L)
+                .name("Alice")
+                .email("alice@example.com")
+                .password("pwd")
+                .role(Role.COMPANY)
+                .build();
+
+        when(userRepository.findAll()).thenReturn(Arrays.asList(testUser, user2));
+
+        List<User> users = userService.getAllUsers();
+
+        assertNotNull(users);
+        assertEquals(2, users.size());
+        assertEquals("John Doe", users.get(0).getName());
+        verify(userRepository, times(1)).findAll();
+    }
+
+    @Test
+    void shouldUpdateUserSuccessfully() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+
+        User update = User.builder()
+                .name("Jane Doe")
+                .email("jane@example.com")
+                .password("newpass")
+                .role(Role.COMPANY)
+                .build();
+
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User updated = userService.updateUser(1L, update);
+
+        assertNotNull(updated);
+        assertEquals("Jane Doe", updated.getName());
+        assertEquals("jane@example.com", updated.getEmail());
+        assertEquals("newpass", updated.getPassword());
+        assertEquals(Role.COMPANY, updated.getRole());
+        verify(userRepository, times(1)).findById(1L);
+        verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    @Test
+    void shouldThrowWhenUpdatingNonExistingUser() {
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> userService.updateUser(999L, testUser));
+        assertEquals("User not found", ex.getMessage());
+        verify(userRepository, times(1)).findById(999L);
+        verify(userRepository, times(0)).save(any(User.class));
+    }
+
+    @Test
+    void shouldDeleteUserSuccessfully() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+
+        userService.deleteUser(1L);
+
+        verify(userRepository, times(1)).findById(1L);
+        verify(userRepository, times(1)).delete(testUser);
+    }
+
+    @Test
+    void shouldThrowWhenDeletingNonExistingUser() {
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> userService.deleteUser(999L));
+        assertEquals("User not found", ex.getMessage());
+        verify(userRepository, times(1)).findById(999L);
+        verify(userRepository, times(0)).delete(any(User.class));
     }
 }
