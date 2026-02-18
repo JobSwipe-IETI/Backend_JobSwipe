@@ -1,4 +1,5 @@
-package ieti.JobSwipe.model;
+package ieti.JobSwipe.model; // Cambio mínimo para forzar actualización
+
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
