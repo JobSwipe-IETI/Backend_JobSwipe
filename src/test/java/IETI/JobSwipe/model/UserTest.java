@@ -1,4 +1,4 @@
-package IETI.JobSwipe.model;
+package ieti.JobSwipe.model;
 
 import ieti.JobSwipe.model.User;
 import ieti.JobSwipe.model.Role;

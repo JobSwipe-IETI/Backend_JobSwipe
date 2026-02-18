@@ -1,4 +1,4 @@
-package IETI.JobSwipe.exception;
+package ieti.JobSwipe.exception;
 
 import ieti.JobSwipe.exception.UserNotFoundException;
 import org.junit.jupiter.api.Test;

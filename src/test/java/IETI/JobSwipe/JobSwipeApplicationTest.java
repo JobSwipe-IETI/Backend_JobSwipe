@@ -1,4 +1,4 @@
-package IETI.JobSwipe;
+package ieti.JobSwipe;
 
 import ieti.JobSwipe.JobSwipeApplication;
 import org.junit.jupiter.api.Test;

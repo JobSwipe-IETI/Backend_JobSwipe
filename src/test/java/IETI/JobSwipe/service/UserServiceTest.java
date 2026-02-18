@@ -1,4 +1,4 @@
-package IETI.JobSwipe.service;
+package ieti.JobSwipe.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

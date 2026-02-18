@@ -1,4 +1,4 @@
-package IETI.JobSwipe.controller;
+package ieti.JobSwipe.controller;
 
 import ieti.JobSwipe.controller.HealthController;
 import org.junit.jupiter.api.BeforeEach;
