@@ -1,7 +1,8 @@
-package IETI.JobSwipe.repository;
+package ieti.JobSwipe.repository;
 
-import IETI.JobSwipe.model.Vacancy;
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import ieti.JobSwipe.model.Vacancy;
 
 import java.util.List;
 

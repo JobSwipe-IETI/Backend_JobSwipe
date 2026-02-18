@@ -1,16 +1,18 @@
 package IETI.JobSwipe.service;
 
-import IETI.JobSwipe.model.Role;
-import IETI.JobSwipe.model.User;
-import IETI.JobSwipe.model.Vacancy;
-import IETI.JobSwipe.repository.UserRepository;
-import IETI.JobSwipe.repository.VacancyRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import ieti.JobSwipe.model.Role;
+import ieti.JobSwipe.model.User;
+import ieti.JobSwipe.model.Vacancy;
+import ieti.JobSwipe.repository.UserRepository;
+import ieti.JobSwipe.repository.VacancyRepository;
+import ieti.JobSwipe.service.VacancyService;
 
 import java.time.LocalDateTime;
 import java.util.List;

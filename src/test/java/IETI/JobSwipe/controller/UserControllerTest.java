@@ -1,9 +1,12 @@
-package IETI.JobSwipe.service;
+package IETI.JobSwipe.controller;
 
-import IETI.JobSwipe.controller.UserController;
-import IETI.JobSwipe.model.Role;
-import IETI.JobSwipe.model.User;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import ieti.JobSwipe.controller.UserController;
+import ieti.JobSwipe.model.Role;
+import ieti.JobSwipe.model.User;
+import ieti.JobSwipe.service.UserService;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

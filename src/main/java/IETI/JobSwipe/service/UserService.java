@@ -1,8 +1,11 @@
-package IETI.JobSwipe.service;
+package ieti.JobSwipe.service;
 
-import IETI.JobSwipe.model.User;
-import IETI.JobSwipe.repository.UserRepository;
 import org.springframework.stereotype.Service;
+
+import ieti.JobSwipe.model.User;
+import ieti.JobSwipe.repository.UserRepository;
+import ieti.JobSwipe.exception.ErrorMessages;
+import ieti.JobSwipe.exception.UserNotFoundException;
 
 import java.util.List;
 
@@ -21,7 +24,7 @@ public class UserService {
 
     public User getUserById(Long id) {
         return userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(ErrorMessages.USER_NOT_FOUND));
     }
 
     public User createUser(User user) {
@@ -30,7 +33,7 @@ public class UserService {
 
     public User updateUser(Long id, User user) {
         User existingUser = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         existingUser.setName(user.getName());
         existingUser.setEmail(user.getEmail());
@@ -42,7 +45,7 @@ public class UserService {
 
     public void deleteUser(Long id) {
         User existingUser = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(ErrorMessages.USER_NOT_FOUND));
         userRepository.delete(existingUser);
     }
 }

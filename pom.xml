@@ -115,6 +115,14 @@
 						</goals>
         			</execution>
     			</executions>
+				<configuration>
+					<excludes>
+						<!-- Excluir métodos generados por Lombok (builders) -->
+						<exclude>**/model/*$*Builder*.class</exclude>
+						<!-- Excluir métodos lambda generados internamente -->
+						<exclude>**/service/*$*.class</exclude>
+					</excludes>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>

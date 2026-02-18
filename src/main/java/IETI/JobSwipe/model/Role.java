@@ -1,4 +1,4 @@
-package IETI.JobSwipe.model;
+package ieti.JobSwipe.model;
 
 public enum Role {
     CANDIDATE,

@@ -1,7 +1,5 @@
-package IETI.JobSwipe.controller;
+package ieti.JobSwipe.controller;
 
-import IETI.JobSwipe.model.Vacancy;
-import IETI.JobSwipe.service.VacancyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -17,6 +15,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import ieti.JobSwipe.model.Vacancy;
+import ieti.JobSwipe.service.VacancyService;
 
 import java.util.List;
 
