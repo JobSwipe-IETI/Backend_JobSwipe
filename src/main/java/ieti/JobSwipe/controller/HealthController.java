@@ -1,4 +1,4 @@
-package IETI.JobSwipe.controller;
+package ieti.JobSwipe.controller;
 
 import java.util.Map;
 
