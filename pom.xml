@@ -8,7 +8,7 @@
 		<version>4.0.2</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>IETI</groupId>
+	<groupId>ieti</groupId>
 	<artifactId>JobSwipe</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>JobSwipe</name>
