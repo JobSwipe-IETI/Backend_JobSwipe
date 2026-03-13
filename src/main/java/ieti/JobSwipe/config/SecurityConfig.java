@@ -26,17 +26,17 @@ public class SecurityConfig {
     };
 
     @Bean
-        public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                                                                   GoogleIdTokenAuthenticationFilter googleIdTokenAuthenticationFilter,
-                                                                                                   RestAuthenticationEntryPoint restAuthenticationEntryPoint) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                                   GoogleIdTokenAuthenticationFilter googleIdTokenAuthenticationFilter,
+                                                   RestAuthenticationEntryPoint restAuthenticationEntryPoint) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(restAuthenticationEntryPoint))
+                .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(restAuthenticationEntryPoint))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-                        .anyRequest().permitAll())
-                                .addFilterBefore(googleIdTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                        .anyRequest().authenticated())
+                .addFilterBefore(googleIdTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 }
