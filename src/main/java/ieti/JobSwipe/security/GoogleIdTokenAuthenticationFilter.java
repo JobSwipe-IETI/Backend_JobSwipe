@@ -21,11 +21,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class GoogleIdTokenAuthenticationFilter extends OncePerRequestFilter {
 
     private final IdentityTokenVerifier identityTokenVerifier;
+    private final UserProvisioningService userProvisioningService;
     private final AuthenticationEntryPoint authenticationEntryPoint;
 
     public GoogleIdTokenAuthenticationFilter(IdentityTokenVerifier identityTokenVerifier,
+                                             UserProvisioningService userProvisioningService,
                                              AuthenticationEntryPoint authenticationEntryPoint) {
         this.identityTokenVerifier = identityTokenVerifier;
+        this.userProvisioningService = userProvisioningService;
         this.authenticationEntryPoint = authenticationEntryPoint;
     }
 
@@ -49,6 +52,7 @@ public class GoogleIdTokenAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             AuthenticatedUser authenticatedUser = identityTokenVerifier.verify(token);
+            userProvisioningService.ensureUserExists(authenticatedUser);
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     authenticatedUser,
                     token,

@@ -5,6 +5,7 @@ import java.security.GeneralSecurityException;
 import java.util.List;
 
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
@@ -39,6 +40,10 @@ public class GoogleIdentityTokenVerifier implements IdentityTokenVerifier {
             }
 
             GoogleIdToken.Payload payload = idToken.getPayload();
+            if (!StringUtils.hasText(payload.getEmail())) {
+                throw new InvalidIdentityTokenException("Google identity token does not contain email");
+            }
+
             return new AuthenticatedUser(
                     payload.getSubject(),
                     payload.getEmail(),
