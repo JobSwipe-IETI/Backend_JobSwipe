@@ -94,6 +94,38 @@ Respuesta esperada:
 
 ---
 
+## Autenticación con Google
+
+El backend valida un Google ID token enviado por el cliente en el header `Authorization` con formato `Bearer <token>`.
+
+### Configuración requerida
+
+Definir la variable de entorno `GOOGLE_OAUTH_CLIENT_ID` con el Client ID de Google configurado para la aplicación.
+
+### Endpoint para obtener identidad autenticada
+
+`GET /auth/me`
+
+Respuesta esperada:
+
+```json
+{
+  "email": "usuario@correo.com",
+  "name": "Nombre Apellido"
+}
+```
+
+### Endpoints públicos
+
+- `GET /api/health`
+- Swagger UI y OpenAPI
+
+### Endpoints protegidos
+
+Todos los demás endpoints requieren un Google ID token válido.
+
+---
+
 ## Planeación del Proyecto
 
 La planeación detallada del desarrollo del backend, incluyendo backlog inicial, historias de usuario y planificación de sprint, está disponible en el siguiente enlace:
