@@ -38,6 +38,8 @@ public class UserService {
         existingUser.setName(user.getName());
         existingUser.setEmail(user.getEmail());
         existingUser.setPassword(user.getPassword());
+        existingUser.setGoogleId(user.getGoogleId());
+        existingUser.setAvatarUrl(user.getAvatarUrl());
         existingUser.setRole(user.getRole());
 
         return userRepository.save(existingUser);

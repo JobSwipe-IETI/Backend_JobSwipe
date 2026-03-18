@@ -13,11 +13,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-@Component
 public class GoogleIdTokenAuthenticationFilter extends OncePerRequestFilter {
 
     private final IdentityTokenVerifier identityTokenVerifier;
@@ -25,8 +23,8 @@ public class GoogleIdTokenAuthenticationFilter extends OncePerRequestFilter {
     private final AuthenticationEntryPoint authenticationEntryPoint;
 
     public GoogleIdTokenAuthenticationFilter(IdentityTokenVerifier identityTokenVerifier,
-                                             UserProvisioningService userProvisioningService,
-                                             AuthenticationEntryPoint authenticationEntryPoint) {
+            UserProvisioningService userProvisioningService,
+            AuthenticationEntryPoint authenticationEntryPoint) {
         this.identityTokenVerifier = identityTokenVerifier;
         this.userProvisioningService = userProvisioningService;
         this.authenticationEntryPoint = authenticationEntryPoint;
@@ -34,8 +32,8 @@ public class GoogleIdTokenAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
+            HttpServletResponse response,
+            FilterChain filterChain) throws ServletException, IOException {
         String authorizationHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
         if (!StringUtils.hasText(authorizationHeader) || !authorizationHeader.startsWith("Bearer ")) {
@@ -56,8 +54,7 @@ public class GoogleIdTokenAuthenticationFilter extends OncePerRequestFilter {
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     authenticatedUser,
                     token,
-                    List.of(new SimpleGrantedAuthority("ROLE_USER"))
-            );
+                    List.of(new SimpleGrantedAuthority("ROLE_USER")));
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
             filterChain.doFilter(request, response);

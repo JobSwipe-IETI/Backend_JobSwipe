@@ -19,8 +19,7 @@ public class GoogleIdentityTokenVerifier implements IdentityTokenVerifier {
 
     private static final List<String> GOOGLE_ISSUERS = List.of(
             "https://accounts.google.com",
-            "accounts.google.com"
-    );
+            "accounts.google.com");
 
     private final GoogleIdTokenVerifier verifier;
 
@@ -47,8 +46,8 @@ public class GoogleIdentityTokenVerifier implements IdentityTokenVerifier {
             return new AuthenticatedUser(
                     payload.getSubject(),
                     payload.getEmail(),
-                    payload.get("name") != null ? payload.get("name").toString() : null
-            );
+                    payload.get("name") != null ? payload.get("name").toString() : null,
+                    payload.get("picture") != null ? payload.get("picture").toString() : null);
         } catch (GeneralSecurityException | IOException exception) {
             throw new InvalidIdentityTokenException("Invalid Google identity token", exception);
         }
