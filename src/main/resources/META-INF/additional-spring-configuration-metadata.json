@@ -1,0 +1,32 @@
+{"properties": [
+  {
+    "name": "google.oauth.client-id",
+    "type": "java.lang.String",
+    "description": "A description for 'google.oauth.client-id'"
+  },
+  {
+    "name": "google.oauth.client-secret",
+    "type": "java.lang.String",
+    "description": "A description for 'google.oauth.client-secret'"
+  },
+  {
+    "name": "app.jwt.issuer",
+    "type": "java.lang.String",
+    "description": "A description for 'app.jwt.issuer'"
+  },
+  {
+    "name": "app.jwt.access-token-expiration-seconds",
+    "type": "java.lang.String",
+    "description": "A description for 'app.jwt.access-token-expiration-seconds'"
+  },
+  {
+    "name": "app.jwt.secret",
+    "type": "java.lang.String",
+    "description": "A description for 'app.jwt.secret'"
+  },
+  {
+    "name": "app.domain",
+    "type": "java.lang.String",
+    "description": "A description for 'app.domain'"
+  }
+]}
