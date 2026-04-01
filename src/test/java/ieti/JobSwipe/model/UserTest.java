@@ -43,16 +43,20 @@ class UserTest {
     @Test
     void shouldSetAndGetUserProperties() {
         User user = new User();
+        Profile profile = new Profile();
+
         user.setId(1L);
         user.setName("John Doe");
         user.setEmail("john@example.com");
         user.setPassword("password123");
         user.setRole(Role.COMPANY);
+        user.setProfile(profile);
 
         assertEquals(1L, user.getId());
         assertEquals("John Doe", user.getName());
         assertEquals("john@example.com", user.getEmail());
         assertEquals("password123", user.getPassword());
         assertEquals(Role.COMPANY, user.getRole());
+        assertEquals(profile, user.getProfile());
     }
 }

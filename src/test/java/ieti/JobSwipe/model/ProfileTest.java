@@ -8,8 +8,20 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 class ProfileTest {
 
+    private User buildUser() {
+        return User.builder()
+                .id(1L)
+                .name("John Doe")
+                .email("john@example.com")
+                .password("password123")
+                .role(Role.CANDIDATE)
+                .build();
+    }
+
     @Test
     void shouldCreateProfileWithBuilder() {
+        User user = buildUser();
+
         Profile profile = Profile.builder()
                 .id(1L)
                 .professionalTitle("Backend Developer")
@@ -18,6 +30,7 @@ class ProfileTest {
                 .experience("3 years of backend experience")
                 .education("Computer Engineering")
                 .location("Bogota, Colombia")
+                .user(user)
                 .build();
 
         assertNotNull(profile);
@@ -28,6 +41,7 @@ class ProfileTest {
         assertEquals("3 years of backend experience", profile.getExperience());
         assertEquals("Computer Engineering", profile.getEducation());
         assertEquals("Bogota, Colombia", profile.getLocation());
+        assertEquals(user, profile.getUser());
     }
 
     @Test
@@ -42,10 +56,13 @@ class ProfileTest {
         assertNull(profile.getExperience());
         assertNull(profile.getEducation());
         assertNull(profile.getLocation());
+        assertNull(profile.getUser());
     }
 
     @Test
     void shouldSetAndGetProfileProperties() {
+        User user = buildUser();
+
         Profile profile = new Profile();
         profile.setId(1L);
         profile.setProfessionalTitle("Frontend Developer");
@@ -54,6 +71,7 @@ class ProfileTest {
         profile.setExperience("2 years of frontend experience");
         profile.setEducation("Software Engineering");
         profile.setLocation("Medellin, Colombia");
+        profile.setUser(user);
 
         assertEquals(1L, profile.getId());
         assertEquals("Frontend Developer", profile.getProfessionalTitle());
@@ -62,5 +80,6 @@ class ProfileTest {
         assertEquals("2 years of frontend experience", profile.getExperience());
         assertEquals("Software Engineering", profile.getEducation());
         assertEquals("Medellin, Colombia", profile.getLocation());
+        assertEquals(user, profile.getUser());
     }
 }
