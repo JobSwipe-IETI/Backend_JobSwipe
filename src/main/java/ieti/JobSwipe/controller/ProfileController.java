@@ -7,10 +7,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import ieti.JobSwipe.dto.CandidateProfileRequest;
 import ieti.JobSwipe.dto.CompanyProfileRequest;
 import ieti.JobSwipe.model.Profile;
+import ieti.JobSwipe.model.Role;
 import ieti.JobSwipe.service.ProfileService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,12 +21,15 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/profiles")
 @Tag(name = "Profiles", description = "Profile management endpoints")
 public class ProfileController {
 
+    private static final Logger logger = LoggerFactory.getLogger(ProfileController.class);
     private final ProfileService profileService;
 
     public ProfileController(ProfileService profileService) {
@@ -37,9 +43,13 @@ public class ProfileController {
         @ApiResponse(responseCode = "404", description = "Profile not found")
     })
     public ResponseEntity<Profile> getProfileByUserId(@PathVariable Long userId) {
+        logger.info("🔍 GET /profiles/user/{} called with userId={}", userId, userId);
         try {
-            return ResponseEntity.ok(profileService.getProfileByUserId(userId));
+            Profile profile = profileService.getProfileByUserId(userId);
+            logger.info("✅ Profile found: id={}", profile.getId());
+            return ResponseEntity.ok(profile);
         } catch (RuntimeException ex) {
+            logger.error("❌ Profile not found for userId={}: {}", userId, ex.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
@@ -53,9 +63,17 @@ public class ProfileController {
     })
     public ResponseEntity<Profile> createCandidateProfile(
             @PathVariable Long userId,
+            @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CandidateProfileRequest request) {
         try {
-            Profile profile = profileService.upsertCandidateProfile(userId, request);
+            final Long effectiveUserId = profileService.resolveEffectiveUserId(
+                    userId,
+                    jwt.getClaimAsString("email"),
+                    jwt.getClaimAsString("googleId"),
+                    jwt.getClaimAsString("name"),
+                    jwt.getClaimAsString("avatarUrl"),
+                    Role.CANDIDATE);
+            Profile profile = profileService.upsertCandidateProfile(effectiveUserId, request);
             return ResponseEntity.status(HttpStatus.CREATED).body(profile);
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
@@ -71,9 +89,17 @@ public class ProfileController {
     })
     public ResponseEntity<Profile> updateCandidateProfile(
             @PathVariable Long userId,
+            @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CandidateProfileRequest request) {
         try {
-            Profile profile = profileService.upsertCandidateProfile(userId, request);
+            final Long effectiveUserId = profileService.resolveEffectiveUserId(
+                    userId,
+                    jwt.getClaimAsString("email"),
+                    jwt.getClaimAsString("googleId"),
+                    jwt.getClaimAsString("name"),
+                    jwt.getClaimAsString("avatarUrl"),
+                    Role.CANDIDATE);
+            Profile profile = profileService.upsertCandidateProfile(effectiveUserId, request);
             return ResponseEntity.ok(profile);
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
@@ -89,9 +115,17 @@ public class ProfileController {
     })
     public ResponseEntity<Profile> createCompanyProfile(
             @PathVariable Long userId,
+            @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CompanyProfileRequest request) {
         try {
-            Profile profile = profileService.upsertCompanyProfile(userId, request);
+            final Long effectiveUserId = profileService.resolveEffectiveUserId(
+                    userId,
+                    jwt.getClaimAsString("email"),
+                    jwt.getClaimAsString("googleId"),
+                    jwt.getClaimAsString("name"),
+                    jwt.getClaimAsString("avatarUrl"),
+                    Role.COMPANY);
+            Profile profile = profileService.upsertCompanyProfile(effectiveUserId, request);
             return ResponseEntity.status(HttpStatus.CREATED).body(profile);
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
@@ -107,9 +141,17 @@ public class ProfileController {
     })
     public ResponseEntity<Profile> updateCompanyProfile(
             @PathVariable Long userId,
+            @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CompanyProfileRequest request) {
         try {
-            Profile profile = profileService.upsertCompanyProfile(userId, request);
+            final Long effectiveUserId = profileService.resolveEffectiveUserId(
+                    userId,
+                    jwt.getClaimAsString("email"),
+                    jwt.getClaimAsString("googleId"),
+                    jwt.getClaimAsString("name"),
+                    jwt.getClaimAsString("avatarUrl"),
+                    Role.COMPANY);
+            Profile profile = profileService.upsertCompanyProfile(effectiveUserId, request);
             return ResponseEntity.ok(profile);
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();

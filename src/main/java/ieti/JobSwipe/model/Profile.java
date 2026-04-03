@@ -55,6 +55,9 @@ public class Profile {
     private String location;
 
     @Column
+    private String nationality;
+
+    @Column
     private String phoneNumber;
 
     @Column(nullable = false)

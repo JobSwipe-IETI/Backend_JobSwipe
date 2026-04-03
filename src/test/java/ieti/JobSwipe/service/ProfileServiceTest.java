@@ -1,6 +1,7 @@
 package ieti.JobSwipe.service;
 
 import ieti.JobSwipe.dto.CandidateProfileRequest;
+import ieti.JobSwipe.dto.CandidateExperienceRequest;
 import ieti.JobSwipe.dto.CompanyProfileRequest;
 import ieti.JobSwipe.model.CandidateProfile;
 import ieti.JobSwipe.model.CompanyProfile;
@@ -61,10 +62,17 @@ class ProfileServiceTest {
     @Test
     void shouldUpsertCandidateProfileAndSetCandidateRole() {
         CandidateProfileRequest request = new CandidateProfileRequest();
+        request.setDisplayName("John Doe");
         request.setProfessionalTitle("Backend Developer");
         request.setSummary("Java developer");
-        request.setSkills("Java, Spring");
-        request.setExperience("3 years");
+        request.setSkills(java.util.List.of("Java", "Spring"));
+        CandidateExperienceRequest experience = new CandidateExperienceRequest();
+        experience.setTitle("Backend Developer");
+        experience.setCompany("Acme");
+        experience.setStartDate("2022-01");
+        experience.setEndDate("2024-01");
+        experience.setCurrent(false);
+        request.setExperiences(java.util.List.of(experience));
         request.setEducation("Systems Engineer");
         request.setLocation("Bogota");
         request.setPhoneNumber("3000000000");
@@ -83,9 +91,11 @@ class ProfileServiceTest {
         assertEquals("Java developer", profile.getSummary());
         assertEquals("3000000000", profile.getPhoneNumber());
         assertEquals(true, profile.getOnboardingCompleted());
+        assertEquals("John Doe", testUser.getName());
         assertEquals(Role.CANDIDATE, testUser.getRole());
         assertNotNull(profile.getCandidateProfile());
         assertEquals("English, Spanish", profile.getCandidateProfile().getLanguages());
+        assertEquals("[\"Java\",\"Spring\"]", profile.getSkills());
 
         verify(userRepository, times(1)).save(testUser);
         verify(profileRepository, times(2)).save(any(Profile.class));

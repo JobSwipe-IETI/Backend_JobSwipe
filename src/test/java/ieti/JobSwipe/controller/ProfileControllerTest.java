@@ -1,6 +1,7 @@
 package ieti.JobSwipe.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import ieti.JobSwipe.dto.CandidateExperienceRequest;
 import ieti.JobSwipe.dto.CandidateProfileRequest;
 import ieti.JobSwipe.dto.CompanyProfileRequest;
 import ieti.JobSwipe.model.Profile;
@@ -72,8 +73,15 @@ class ProfileControllerTest {
     @Test
     void shouldCreateCandidateProfile() throws Exception {
         CandidateProfileRequest request = new CandidateProfileRequest();
+                request.setDisplayName("John Doe");
         request.setProfessionalTitle("Backend Developer");
         request.setSummary("Summary");
+                request.setSkills(java.util.List.of("Java", "Spring"));
+                CandidateExperienceRequest experience = new CandidateExperienceRequest();
+                experience.setTitle("Backend Developer");
+                experience.setCompany("Acme");
+                experience.setStartDate("2022-01");
+                request.setExperiences(java.util.List.of(experience));
 
         Profile profile = Profile.builder()
                 .id(1L)
