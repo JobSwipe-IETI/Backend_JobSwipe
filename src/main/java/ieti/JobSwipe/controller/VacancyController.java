@@ -1,15 +1,16 @@
 package ieti.JobSwipe.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import ieti.JobSwipe.dto.CreateExtendedVacancyRequest;
+import ieti.JobSwipe.dto.CreateVacancyRequest;
+import ieti.JobSwipe.model.Vacancy;
+import ieti.JobSwipe.service.VacancyService;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,13 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
-
-import ieti.JobSwipe.model.Vacancy;
-import ieti.JobSwipe.service.VacancyService;
 
 import java.util.List;
 
@@ -32,8 +27,6 @@ import java.util.List;
 @Tag(name = "Vacancies", description = "Vacancy management endpoints")
 public class VacancyController {
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
     private final VacancyService vacancyService;
 
     public VacancyController(VacancyService vacancyService) {
@@ -41,16 +34,16 @@ public class VacancyController {
     }
 
     @GetMapping
-    @Operation(summary = "Get all vacancies", description = "Retrieve a list of all vacancies in the system")
+    @Operation(summary = "Get all vacancies")
     @ApiResponse(responseCode = "200", description = "Vacancies retrieved successfully")
     public ResponseEntity<List<Vacancy>> getAllVacancies() {
         return ResponseEntity.ok(vacancyService.getAllVacancies());
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get vacancy by ID", description = "Retrieve a specific vacancy by its ID")
+    @Operation(summary = "Get vacancy by ID")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Vacancy found and returned successfully"),
+        @ApiResponse(responseCode = "200", description = "Vacancy found"),
         @ApiResponse(responseCode = "404", description = "Vacancy not found")
     })
     public ResponseEntity<Vacancy> getVacancyById(@PathVariable Long id) {
@@ -62,37 +55,20 @@ public class VacancyController {
     }
 
     @PostMapping
-    @Operation(summary = "Create a new vacancy", description = "Create a new vacancy for a company")
+    @Operation(summary = "Create a vacancy", description = "Creates a vacancy for the authenticated company user")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "201", description = "Vacancy created successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid data or user is not a company"),
         @ApiResponse(responseCode = "404", description = "Company not found")
     })
-    public ResponseEntity<Vacancy> createVacancy(@RequestBody Vacancy vacancy,
-                                                 @RequestParam Long companyId) {
+    public ResponseEntity<Vacancy> createVacancy(
+            @RequestBody CreateVacancyRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
         try {
-            Vacancy createdVacancy = vacancyService.createVacancy(vacancy, companyId);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdVacancy);
-        } catch (RuntimeException ex) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-    }
-
-    @PostMapping(value = "/extended/multipart", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Create an extended vacancy with optional document")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "201", description = "Extended vacancy created successfully"),
-        @ApiResponse(responseCode = "400", description = "Invalid payload or role is not allowed"),
-        @ApiResponse(responseCode = "404", description = "Company not found")
-    })
-    public ResponseEntity<Vacancy> createExtendedVacancy(
-            @RequestParam Long companyId,
-            @RequestPart("payload") String payload,
-            @RequestPart(value = "document", required = false) MultipartFile document) {
-        try {
-            CreateExtendedVacancyRequest request = OBJECT_MAPPER.readValue(payload, CreateExtendedVacancyRequest.class);
-            Vacancy createdVacancy = vacancyService.createExtendedVacancy(request, companyId, document);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdVacancy);
-        } catch (JsonProcessingException | IllegalArgumentException ex) {
+            Long companyId = Long.parseLong(jwt.getSubject());
+            Vacancy created = vacancyService.createVacancy(request, companyId);
+            return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        } catch (IllegalArgumentException ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
@@ -100,21 +76,26 @@ public class VacancyController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update a vacancy", description = "Update an existing vacancy by ID")
+    @Operation(summary = "Update a vacancy")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Vacancy updated successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid data"),
         @ApiResponse(responseCode = "404", description = "Vacancy not found")
     })
-    public ResponseEntity<Vacancy> updateVacancy(@PathVariable Long id, @RequestBody Vacancy vacancy) {
+    public ResponseEntity<Vacancy> updateVacancy(
+            @PathVariable Long id,
+            @RequestBody CreateVacancyRequest request) {
         try {
-            return ResponseEntity.ok(vacancyService.updateVacancy(id, vacancy));
+            return ResponseEntity.ok(vacancyService.updateVacancy(id, request));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete a vacancy", description = "Delete a vacancy by ID")
+    @Operation(summary = "Delete a vacancy")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "204", description = "Vacancy deleted successfully"),
         @ApiResponse(responseCode = "404", description = "Vacancy not found")
