@@ -3,6 +3,7 @@ package ieti.JobSwipe.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ieti.JobSwipe.controller.VacancyController;
+import ieti.JobSwipe.dto.CreateExtendedVacancyRequest;
 import ieti.JobSwipe.model.Role;
 import ieti.JobSwipe.model.User;
 import ieti.JobSwipe.model.Vacancy;
@@ -29,7 +30,9 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.springframework.mock.web.MockMultipartFile;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -241,6 +244,66 @@ class VacancyControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(vacancyService, times(1)).deleteVacancy(1L);
+    }
+
+    @Test
+    void shouldCreateExtendedVacancyWithMultipartPayload() throws Exception {
+        CreateExtendedVacancyRequest request = new CreateExtendedVacancyRequest();
+        request.setPositionRequested("Backend Developer");
+        request.setVacancySummary("Vacancy summary");
+        request.setDesiredMonthlySalary(5000.0);
+        request.setApplicationDate("2026-04-02");
+        request.setCandidateFullName("John Doe");
+        request.setPhoneNumber("3000000000");
+        request.setEmail("john@example.com");
+        request.setPermanentAddress("Main Street 123");
+        request.setBirthDate("1995-01-01");
+        request.setOfficialIdentification("ID-12345");
+        request.setAcademicLevel("Professional");
+        request.setInstitutionDetails("University");
+        request.setPreviousEmploymentData("2 years");
+        request.setResponsibilities("Backend services");
+
+        MockMultipartFile payloadPart = new MockMultipartFile(
+                "payload",
+                "payload.json",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(request));
+
+        MockMultipartFile documentPart = new MockMultipartFile(
+                "document",
+                "cv.pdf",
+                MediaType.APPLICATION_PDF_VALUE,
+                "fake-pdf-content".getBytes());
+
+        when(vacancyService.createExtendedVacancy(any(CreateExtendedVacancyRequest.class), eq(1L), any()))
+                .thenReturn(testVacancy);
+
+        mockMvc.perform(multipart("/vacancies/extended/multipart")
+                .file(payloadPart)
+                .file(documentPart)
+                .param("companyId", "1")
+                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.title", is("Backend Developer")));
+
+        verify(vacancyService, times(1)).createExtendedVacancy(any(CreateExtendedVacancyRequest.class), eq(1L), any());
+    }
+
+    @Test
+    void shouldReturn400WhenExtendedPayloadIsInvalidJson() throws Exception {
+        MockMultipartFile payloadPart = new MockMultipartFile(
+                "payload",
+                "payload.json",
+                MediaType.APPLICATION_JSON_VALUE,
+                "{ invalid json }".getBytes());
+
+        mockMvc.perform(multipart("/vacancies/extended/multipart")
+                .file(payloadPart)
+                .param("companyId", "1")
+                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
