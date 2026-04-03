@@ -13,7 +13,6 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import jakarta.persistence.CascadeType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -23,53 +22,49 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "profiles")
+@Table(name = "company_profiles")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Profile {
+public class CompanyProfile {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)
-    private String professionalTitle;
-
-    @Lob
-    @Column(nullable = false)
-    private String summary;
-
-    @Lob
-    private String skills;
-
-    @Lob
-    private String experience;
-
-    @Lob
-    private String education;
+    private String companyName;
 
     @Column
-    private String location;
+    private String legalId;
 
     @Column
-    private String phoneNumber;
+    private String industry;
 
-    @Column(nullable = false)
-    private Boolean onboardingCompleted;
+    @Column
+    private String companySize;
+
+    @Column
+    private String website;
+
+    @Column
+    private String headquartersLocation;
+
+    @Lob
+    private String companyDescription;
+
+    @Column
+    private String hiringContactName;
+
+    @Column
+    private String hiringContactEmail;
 
     @OneToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    @JoinColumn(name = "profile_id", nullable = false, unique = true)
     @JsonIgnore
-    private User user;
-
-    @OneToOne(mappedBy = "profile", cascade = CascadeType.ALL, orphanRemoval = true)
-    private CandidateProfile candidateProfile;
-
-    @OneToOne(mappedBy = "profile", cascade = CascadeType.ALL, orphanRemoval = true)
-    private CompanyProfile companyProfile;
+    private Profile profile;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -82,9 +77,6 @@ public class Profile {
         LocalDateTime now = LocalDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;
-        if (this.onboardingCompleted == null) {
-            this.onboardingCompleted = false;
-        }
     }
 
     @PreUpdate
