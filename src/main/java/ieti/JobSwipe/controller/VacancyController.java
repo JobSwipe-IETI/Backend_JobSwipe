@@ -1,10 +1,14 @@
 package ieti.JobSwipe.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import ieti.JobSwipe.dto.CreateExtendedVacancyRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,8 +17,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import ieti.JobSwipe.model.Vacancy;
 import ieti.JobSwipe.service.VacancyService;
@@ -25,6 +31,8 @@ import java.util.List;
 @RequestMapping("/vacancies")
 @Tag(name = "Vacancies", description = "Vacancy management endpoints")
 public class VacancyController {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final VacancyService vacancyService;
 
@@ -64,6 +72,28 @@ public class VacancyController {
         try {
             Vacancy createdVacancy = vacancyService.createVacancy(vacancy, companyId);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdVacancy);
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
+
+    @PostMapping(value = "/extended/multipart", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Create an extended vacancy with optional document")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "Extended vacancy created successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid payload or role is not allowed"),
+        @ApiResponse(responseCode = "404", description = "Company not found")
+    })
+    public ResponseEntity<Vacancy> createExtendedVacancy(
+            @RequestParam Long companyId,
+            @RequestPart("payload") String payload,
+            @RequestPart(value = "document", required = false) MultipartFile document) {
+        try {
+            CreateExtendedVacancyRequest request = OBJECT_MAPPER.readValue(payload, CreateExtendedVacancyRequest.class);
+            Vacancy createdVacancy = vacancyService.createExtendedVacancy(request, companyId, document);
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdVacancy);
+        } catch (JsonProcessingException | IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
