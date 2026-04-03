@@ -1,12 +1,9 @@
 package ieti.JobSwipe.model;
 
-import ieti.JobSwipe.model.Vacancy;
-import ieti.JobSwipe.model.User;
-import ieti.JobSwipe.model.Role;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -33,7 +30,12 @@ class VacancyTest {
                 .id(1L)
                 .title("Backend Developer")
                 .description("Java + Spring Boot")
-                .salary(5000.0)
+                .location("Bogotá, Colombia")
+                .modality(Modality.REMOTE)
+                .employmentType(EmploymentType.FULL_TIME)
+                .experienceLevel(ExperienceLevel.SENIOR)
+                .minSalary(5000.0)
+                .maxSalary(7000.0)
                 .company(testCompany)
                 .build();
 
@@ -41,7 +43,12 @@ class VacancyTest {
         assertEquals(1L, vacancy.getId());
         assertEquals("Backend Developer", vacancy.getTitle());
         assertEquals("Java + Spring Boot", vacancy.getDescription());
-        assertEquals(5000.0, vacancy.getSalary());
+        assertEquals("Bogotá, Colombia", vacancy.getLocation());
+        assertEquals(Modality.REMOTE, vacancy.getModality());
+        assertEquals(EmploymentType.FULL_TIME, vacancy.getEmploymentType());
+        assertEquals(ExperienceLevel.SENIOR, vacancy.getExperienceLevel());
+        assertEquals(5000.0, vacancy.getMinSalary());
+        assertEquals(7000.0, vacancy.getMaxSalary());
         assertEquals(testCompany, vacancy.getCompany());
     }
 
@@ -53,7 +60,9 @@ class VacancyTest {
         assertNull(vacancy.getId());
         assertNull(vacancy.getTitle());
         assertNull(vacancy.getDescription());
-        assertNull(vacancy.getSalary());
+        assertNull(vacancy.getLocation());
+        assertNull(vacancy.getMinSalary());
+        assertNull(vacancy.getMaxSalary());
         assertNull(vacancy.getCompany());
     }
 
@@ -63,13 +72,26 @@ class VacancyTest {
         vacancy.setId(1L);
         vacancy.setTitle("Frontend Developer");
         vacancy.setDescription("React + TypeScript");
-        vacancy.setSalary(4500.0);
+        vacancy.setLocation("Medellín, Colombia");
+        vacancy.setModality(Modality.HYBRID);
+        vacancy.setEmploymentType(EmploymentType.PART_TIME);
+        vacancy.setExperienceLevel(ExperienceLevel.JUNIOR);
+        vacancy.setMinSalary(3000.0);
+        vacancy.setMaxSalary(4500.0);
+        vacancy.setTechnologies(List.of("React", "TypeScript"));
+        vacancy.setSoftSkills(List.of("Comunicación", "Trabajo en equipo"));
         vacancy.setCompany(testCompany);
 
         assertEquals(1L, vacancy.getId());
         assertEquals("Frontend Developer", vacancy.getTitle());
         assertEquals("React + TypeScript", vacancy.getDescription());
-        assertEquals(4500.0, vacancy.getSalary());
+        assertEquals("Medellín, Colombia", vacancy.getLocation());
+        assertEquals(Modality.HYBRID, vacancy.getModality());
+        assertEquals(EmploymentType.PART_TIME, vacancy.getEmploymentType());
+        assertEquals(ExperienceLevel.JUNIOR, vacancy.getExperienceLevel());
+        assertEquals(3000.0, vacancy.getMinSalary());
+        assertEquals(4500.0, vacancy.getMaxSalary());
+        assertEquals(2, vacancy.getTechnologies().size());
         assertEquals(testCompany, vacancy.getCompany());
     }
 }
