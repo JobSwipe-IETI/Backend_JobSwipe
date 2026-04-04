@@ -1,6 +1,9 @@
 package ieti.JobSwipe.model;
 
+import java.time.LocalDateTime;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -17,8 +20,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "candidate_profiles")
@@ -44,6 +45,12 @@ public class CandidateProfile {
 
     @Column
     private String portfolioUrl;
+
+    @Column
+    private String githubUrl;
+
+    @Column
+    private String linkedinUrl;
 
     @Column
     private String cvUrl;

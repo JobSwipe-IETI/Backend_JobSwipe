@@ -60,11 +60,16 @@ public class CandidateProfileRequest {
 
     @Pattern(
         regexp = "^$|^(https?://).+",
-        message = "El portafolio debe ser una URL valida que inicie con http:// o https://")
-    private String portfolioUrl;
+        message = "El GitHub debe ser una URL valida que inicie con http:// o https://")
+    private String githubUrl;
 
     @Pattern(
         regexp = "^$|^(https?://).+",
-        message = "El CV debe ser una URL valida que inicie con http:// o https://")
-    private String cvUrl;
+        message = "El LinkedIn debe ser una URL valida que inicie con http:// o https://")
+    private String linkedinUrl;
+
+    @Pattern(
+        regexp = "^$|^(https?://).+",
+        message = "El portafolio debe ser una URL valida que inicie con http:// o https://")
+    private String portfolioUrl;
 }

@@ -12,7 +12,8 @@ import ieti.JobSwipe.service.ProfileService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -63,16 +64,9 @@ public class ProfileController {
     })
     public ResponseEntity<Profile> createCandidateProfile(
             @PathVariable Long userId,
-            @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CandidateProfileRequest request) {
         try {
-            final Long effectiveUserId = profileService.resolveEffectiveUserId(
-                    userId,
-                    jwt.getClaimAsString("email"),
-                    jwt.getClaimAsString("googleId"),
-                    jwt.getClaimAsString("name"),
-                    jwt.getClaimAsString("avatarUrl"),
-                    Role.CANDIDATE);
+            final Long effectiveUserId = resolveEffectiveUserId(userId, Role.CANDIDATE);
             Profile profile = profileService.upsertCandidateProfile(effectiveUserId, request);
             return ResponseEntity.status(HttpStatus.CREATED).body(profile);
         } catch (RuntimeException ex) {
@@ -89,22 +83,16 @@ public class ProfileController {
     })
     public ResponseEntity<Profile> updateCandidateProfile(
             @PathVariable Long userId,
-            @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CandidateProfileRequest request) {
         try {
-            final Long effectiveUserId = profileService.resolveEffectiveUserId(
-                    userId,
-                    jwt.getClaimAsString("email"),
-                    jwt.getClaimAsString("googleId"),
-                    jwt.getClaimAsString("name"),
-                    jwt.getClaimAsString("avatarUrl"),
-                    Role.CANDIDATE);
+            final Long effectiveUserId = resolveEffectiveUserId(userId, Role.CANDIDATE);
             Profile profile = profileService.upsertCandidateProfile(effectiveUserId, request);
             return ResponseEntity.ok(profile);
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
+
 
     @PostMapping("/company/{userId}")
     @Operation(summary = "Create or update company profile")
@@ -115,16 +103,9 @@ public class ProfileController {
     })
     public ResponseEntity<Profile> createCompanyProfile(
             @PathVariable Long userId,
-            @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CompanyProfileRequest request) {
         try {
-            final Long effectiveUserId = profileService.resolveEffectiveUserId(
-                    userId,
-                    jwt.getClaimAsString("email"),
-                    jwt.getClaimAsString("googleId"),
-                    jwt.getClaimAsString("name"),
-                    jwt.getClaimAsString("avatarUrl"),
-                    Role.COMPANY);
+            final Long effectiveUserId = resolveEffectiveUserId(userId, Role.COMPANY);
             Profile profile = profileService.upsertCompanyProfile(effectiveUserId, request);
             return ResponseEntity.status(HttpStatus.CREATED).body(profile);
         } catch (RuntimeException ex) {
@@ -141,20 +122,28 @@ public class ProfileController {
     })
     public ResponseEntity<Profile> updateCompanyProfile(
             @PathVariable Long userId,
-            @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CompanyProfileRequest request) {
         try {
-            final Long effectiveUserId = profileService.resolveEffectiveUserId(
-                    userId,
-                    jwt.getClaimAsString("email"),
-                    jwt.getClaimAsString("googleId"),
-                    jwt.getClaimAsString("name"),
-                    jwt.getClaimAsString("avatarUrl"),
-                    Role.COMPANY);
+            final Long effectiveUserId = resolveEffectiveUserId(userId, Role.COMPANY);
             Profile profile = profileService.upsertCompanyProfile(effectiveUserId, request);
             return ResponseEntity.ok(profile);
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
+    }
+
+    private Long resolveEffectiveUserId(Long userId, Role fallbackRole) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+            return profileService.resolveEffectiveUserId(
+                    userId,
+                    jwt.getClaimAsString("email"),
+                    jwt.getClaimAsString("googleId"),
+                    jwt.getClaimAsString("name"),
+                    jwt.getClaimAsString("avatarUrl"),
+                    fallbackRole);
+        }
+
+        return userId;
     }
 }

@@ -78,6 +78,8 @@ class ProfileServiceTest {
         request.setPhoneNumber("3000000000");
         request.setLanguages("English, Spanish");
         request.setExpectedSalary(5000.0);
+        request.setGithubUrl("https://github.com/johndoe");
+        request.setLinkedinUrl("https://linkedin.com/in/johndoe");
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(profileRepository.findByUserId(1L)).thenReturn(Optional.empty());
@@ -96,6 +98,8 @@ class ProfileServiceTest {
         assertNotNull(profile.getCandidateProfile());
         assertEquals("English, Spanish", profile.getCandidateProfile().getLanguages());
         assertEquals("[\"Java\",\"Spring\"]", profile.getSkills());
+        assertEquals("https://github.com/johndoe", profile.getCandidateProfile().getGithubUrl());
+        assertEquals("https://linkedin.com/in/johndoe", profile.getCandidateProfile().getLinkedinUrl());
 
         verify(userRepository, times(1)).save(testUser);
         verify(profileRepository, times(2)).save(any(Profile.class));

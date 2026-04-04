@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -73,15 +74,16 @@ class ProfileControllerTest {
     @Test
     void shouldCreateCandidateProfile() throws Exception {
         CandidateProfileRequest request = new CandidateProfileRequest();
-                request.setDisplayName("John Doe");
+        request.setDisplayName("John Doe");
         request.setProfessionalTitle("Backend Developer");
-        request.setSummary("Summary");
-                request.setSkills(java.util.List.of("Java", "Spring"));
-                CandidateExperienceRequest experience = new CandidateExperienceRequest();
-                experience.setTitle("Backend Developer");
-                experience.setCompany("Acme");
-                experience.setStartDate("2022-01");
-                request.setExperiences(java.util.List.of(experience));
+        request.setSummary("Backend developer with extensive experience in Java, Spring Boot and APIs.");
+        request.setSkills(java.util.List.of("Java", "Spring"));
+        CandidateExperienceRequest experience = new CandidateExperienceRequest();
+        experience.setTitle("Backend Developer");
+        experience.setCompany("Acme");
+        experience.setStartDate("2022-01");
+        request.setExperiences(java.util.List.of(experience));
+        request.setNationality("Colombia");
 
         Profile profile = Profile.builder()
                 .id(1L)
@@ -93,6 +95,7 @@ class ProfileControllerTest {
         when(profileService.upsertCandidateProfile(eq(1L), any(CandidateProfileRequest.class))).thenReturn(profile);
 
         mockMvc.perform(post("/profiles/candidate/1")
+                .with(jwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -105,7 +108,8 @@ class ProfileControllerTest {
     void shouldUpdateCompanyProfile() throws Exception {
         CompanyProfileRequest request = new CompanyProfileRequest();
         request.setCompanyName("Acme SAS");
-        request.setCompanyDescription("Desc");
+                request.setCompanyDescription("Tech company focused on software development, cloud services and digital products.");
+                request.setNationality("Colombia");
 
         Profile profile = Profile.builder()
                 .id(1L)
@@ -117,6 +121,7 @@ class ProfileControllerTest {
         when(profileService.upsertCompanyProfile(eq(1L), any(CompanyProfileRequest.class))).thenReturn(profile);
 
         mockMvc.perform(put("/profiles/company/1")
+                .with(jwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -124,4 +129,5 @@ class ProfileControllerTest {
 
         verify(profileService, times(1)).upsertCompanyProfile(eq(1L), any(CompanyProfileRequest.class));
     }
+
 }
