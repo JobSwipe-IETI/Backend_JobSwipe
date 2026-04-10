@@ -86,6 +86,16 @@ class ProfileControllerTest {
     }
 
     @Test
+    void shouldReturn404WhenProfileByUserIdIsMissing() {
+        when(profileService.getProfileByUserId(99L)).thenThrow(new RuntimeException("Profile not found"));
+
+        ResponseEntity<Profile> response = profileController.getProfileByUserId(99L);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        verify(profileService, times(1)).getProfileByUserId(99L);
+    }
+
+    @Test
     void shouldCreateCandidateProfile() throws Exception {
         CandidateProfileRequest request = new CandidateProfileRequest();
         request.setDisplayName("John Doe");
@@ -142,6 +152,70 @@ class ProfileControllerTest {
                 .andExpect(jsonPath("$.professionalTitle", is("Acme SAS")));
 
         verify(profileService, times(1)).upsertCompanyProfile(eq(1L), any(CompanyProfileRequest.class));
+    }
+
+    @Test
+    void shouldUpdateCandidateProfile() {
+        CandidateProfileRequest request = new CandidateProfileRequest();
+        request.setDisplayName("John Doe");
+        request.setProfessionalTitle("Backend Developer");
+        request.setSummary("Experienced backend developer");
+        request.setNationality("Colombia");
+
+        Profile profile = Profile.builder()
+                .id(15L)
+                .professionalTitle("Backend Developer")
+                .summary("Experienced backend developer")
+                .build();
+
+        when(profileService.upsertCandidateProfile(eq(1L), any(CandidateProfileRequest.class))).thenReturn(profile);
+
+        ResponseEntity<Profile> response = profileController.updateCandidateProfile(1L, request);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(15L, response.getBody().getId());
+        verify(profileService, times(1)).upsertCandidateProfile(eq(1L), any(CandidateProfileRequest.class));
+    }
+
+    @Test
+    void shouldReturn404WhenUpdatingCandidateProfileFails() {
+        CandidateProfileRequest request = new CandidateProfileRequest();
+        request.setDisplayName("John Doe");
+        request.setProfessionalTitle("Backend Developer");
+        request.setSummary("Experienced backend developer");
+        request.setNationality("Colombia");
+
+        when(profileService.upsertCandidateProfile(eq(1L), any(CandidateProfileRequest.class)))
+                .thenThrow(new RuntimeException("Profile not found"));
+
+        ResponseEntity<Profile> response = profileController.updateCandidateProfile(1L, request);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void shouldCreateCompanyProfileUsingJwtClaimsToResolveUser() {
+        CompanyProfileRequest request = new CompanyProfileRequest();
+        request.setCompanyName("Acme");
+        request.setCompanyDescription("A company description long enough");
+        request.setNationality("Colombia");
+
+        Profile profile = Profile.builder().id(30L).professionalTitle("Acme").build();
+
+        when(profileService.resolveEffectiveUserId(1L, "acme@example.com", "google-company", "Acme Admin", "https://avatar", Role.COMPANY))
+                .thenReturn(88L);
+        when(profileService.upsertCompanyProfile(eq(88L), any(CompanyProfileRequest.class))).thenReturn(profile);
+
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(jwtToken("1", "acme@example.com", "Acme Admin", "google-company", "https://avatar"), null));
+
+        ResponseEntity<Profile> response = profileController.createCompanyProfile(1L, request);
+
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertEquals(30L, response.getBody().getId());
+        verify(profileService, times(1))
+                .resolveEffectiveUserId(1L, "acme@example.com", "google-company", "Acme Admin", "https://avatar", Role.COMPANY);
+        verify(profileService, times(1)).upsertCompanyProfile(eq(88L), any(CompanyProfileRequest.class));
     }
 
     @Test

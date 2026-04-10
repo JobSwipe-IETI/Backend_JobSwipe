@@ -6,7 +6,6 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -160,5 +159,46 @@ class DocumentStorageServiceTest {
         assertEquals("jobswipe/uploads", normalized);
         assertEquals("https://cdn.example.com/jobswipe/uploads/file.pdf", storagePath);
         assertEquals("pdf", extension);
+    }
+
+    @Test
+    void shouldBuildS3SchemePathWhenPublicBaseUrlIsMissing() throws Exception {
+        DocumentStorageService service = new DocumentStorageService(
+                "s3",
+                tempDir.toString(),
+                "bucket-name",
+                "us-east-1",
+                "jobswipe/uploads",
+                "");
+
+        Method buildS3StoragePath = DocumentStorageService.class.getDeclaredMethod("buildS3StoragePath", String.class);
+        buildS3StoragePath.setAccessible(true);
+        String storagePath = (String) buildS3StoragePath.invoke(service, "jobswipe/uploads/file.pdf");
+
+        assertEquals("s3://bucket-name/jobswipe/uploads/file.pdf", storagePath);
+    }
+
+    @Test
+    void shouldHandleBlankPrefixAndMissingExtension() throws Exception {
+        DocumentStorageService service = new DocumentStorageService(
+                "local",
+                tempDir.toString(),
+                "",
+                "us-east-1",
+                "   ",
+                "");
+
+        Method normalizePrefix = DocumentStorageService.class.getDeclaredMethod("normalizePrefix", String.class);
+        normalizePrefix.setAccessible(true);
+        String normalized = (String) normalizePrefix.invoke(service, "   ");
+
+        Method extractExtension = DocumentStorageService.class.getDeclaredMethod("extractExtension", String.class);
+        extractExtension.setAccessible(true);
+        String extensionWithoutDot = (String) extractExtension.invoke(service, "README");
+        String extensionTrailingDot = (String) extractExtension.invoke(service, "README.");
+
+        assertEquals("", normalized);
+        assertEquals("", extensionWithoutDot);
+        assertEquals("", extensionTrailingDot);
     }
 }
