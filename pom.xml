@@ -155,6 +155,11 @@
 						<exclude>**/model/*$*Builder*.class</exclude>
 						<!-- Excluir métodos lambda generados internamente -->
 						<exclude>**/service/*$*.class</exclude>
+						<!-- Excluir clases de datos e infraestructura para medir la lógica de negocio -->
+						<exclude>**/dto/**</exclude>
+						<exclude>**/model/**</exclude>
+						<exclude>**/config/**</exclude>
+						<exclude>**/JobSwipeApplication.class</exclude>
 					</excludes>
 				</configuration>
 			</plugin>

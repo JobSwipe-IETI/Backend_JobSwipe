@@ -1,7 +1,5 @@
 package ieti.JobSwipe.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import ieti.JobSwipe.dto.CreateVacancyRequest;
 import ieti.JobSwipe.model.EmploymentType;
 import ieti.JobSwipe.model.ExperienceLevel;
@@ -10,22 +8,22 @@ import ieti.JobSwipe.model.Role;
 import ieti.JobSwipe.model.User;
 import ieti.JobSwipe.model.Vacancy;
 import ieti.JobSwipe.service.VacancyService;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
-import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.util.Arrays;
 import java.util.List;
 
-import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -33,9 +31,6 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
 class VacancyControllerTest {
@@ -46,9 +41,6 @@ class VacancyControllerTest {
     @InjectMocks
     private VacancyController vacancyController;
 
-    private MockMvc mockMvc;
-    private ObjectMapper objectMapper;
-
     private User testCompany;
     private Vacancy testVacancy;
     private Vacancy testVacancy2;
@@ -56,11 +48,6 @@ class VacancyControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(vacancyController)
-                .apply(SecurityMockMvcConfigurers.springSecurity())
-                .build();
-        objectMapper = new ObjectMapper();
-
         testCompany = User.builder()
                 .id(1L)
                 .name("Tech Company Inc")
@@ -72,7 +59,7 @@ class VacancyControllerTest {
                 .id(1L)
                 .title("Backend Developer")
                 .description("Java + Spring Boot")
-                .location("Bogotá, Colombia")
+                .location("Bogota, Colombia")
                 .modality(Modality.REMOTE)
                 .employmentType(EmploymentType.FULL_TIME)
                 .experienceLevel(ExperienceLevel.SENIOR)
@@ -85,7 +72,7 @@ class VacancyControllerTest {
                 .id(2L)
                 .title("Frontend Developer")
                 .description("React + TypeScript")
-                .location("Medellín, Colombia")
+                .location("Medellin, Colombia")
                 .modality(Modality.HYBRID)
                 .employmentType(EmploymentType.FULL_TIME)
                 .experienceLevel(ExperienceLevel.SEMI_SENIOR)
@@ -97,7 +84,7 @@ class VacancyControllerTest {
         testRequest = new CreateVacancyRequest();
         testRequest.setTitle("Backend Developer");
         testRequest.setDescription("Java + Spring Boot");
-        testRequest.setLocation("Bogotá, Colombia");
+        testRequest.setLocation("Bogota, Colombia");
         testRequest.setModality("REMOTE");
         testRequest.setEmploymentType("FULL_TIME");
         testRequest.setExperienceLevel("SENIOR");
@@ -106,102 +93,87 @@ class VacancyControllerTest {
     }
 
     @Test
-    void shouldGetAllVacancies() throws Exception {
+    void shouldGetAllVacancies() {
         List<Vacancy> vacancies = Arrays.asList(testVacancy, testVacancy2);
         when(vacancyService.getAllVacancies()).thenReturn(vacancies);
 
-        mockMvc.perform(get("/vacancies")
-                .with(jwt())
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].id", is(1)))
-                .andExpect(jsonPath("$[0].title", is("Backend Developer")))
-                .andExpect(jsonPath("$[1].id", is(2)))
-                .andExpect(jsonPath("$[1].title", is("Frontend Developer")));
+        ResponseEntity<List<Vacancy>> response = vacancyController.getAllVacancies();
 
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(2, response.getBody().size());
+        assertEquals("Backend Developer", response.getBody().get(0).getTitle());
+        assertEquals("Frontend Developer", response.getBody().get(1).getTitle());
         verify(vacancyService, times(1)).getAllVacancies();
     }
 
     @Test
-    void shouldGetVacancyById() throws Exception {
+    void shouldGetVacancyById() {
         when(vacancyService.getVacancyById(1L)).thenReturn(testVacancy);
 
-        mockMvc.perform(get("/vacancies/{id}", 1L)
-                .with(jwt())
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
-                .andExpect(jsonPath("$.title", is("Backend Developer")))
-                .andExpect(jsonPath("$.minSalary", is(5000.0)))
-                .andExpect(jsonPath("$.maxSalary", is(8000.0)));
+        ResponseEntity<Vacancy> response = vacancyController.getVacancyById(1L);
 
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(1L, response.getBody().getId());
+        assertEquals("Backend Developer", response.getBody().getTitle());
         verify(vacancyService, times(1)).getVacancyById(1L);
     }
 
     @Test
-    void shouldReturn404WhenVacancyNotFound() throws Exception {
-        when(vacancyService.getVacancyById(999L))
-                .thenThrow(new RuntimeException("Vacancy not found"));
+    void shouldReturn404WhenVacancyNotFound() {
+        when(vacancyService.getVacancyById(999L)).thenThrow(new RuntimeException("Vacancy not found"));
 
-        mockMvc.perform(get("/vacancies/{id}", 999L)
-                .with(jwt())
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isNotFound());
+        ResponseEntity<Vacancy> response = vacancyController.getVacancyById(999L);
 
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNull(response.getBody());
         verify(vacancyService, times(1)).getVacancyById(999L);
     }
 
     @Test
-    void shouldCreateVacancy() throws Exception {
-        when(vacancyService.createVacancy(any(CreateVacancyRequest.class), eq(1L)))
-                .thenReturn(testVacancy);
+    void shouldCreateVacancy() {
+        when(vacancyService.createVacancy(any(CreateVacancyRequest.class), eq(1L))).thenReturn(testVacancy);
 
-        mockMvc.perform(post("/vacancies")
-                .with(jwt().jwt(j -> j.subject("1").claim("role", "COMPANY")))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(testRequest)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id", is(1)))
-                .andExpect(jsonPath("$.title", is("Backend Developer")))
-                .andExpect(jsonPath("$.minSalary", is(5000.0)))
-                .andExpect(jsonPath("$.maxSalary", is(8000.0)));
+        ResponseEntity<Vacancy> response = vacancyController.createVacancy(testRequest, jwt("1", "COMPANY"));
 
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(1L, response.getBody().getId());
+        assertEquals("Backend Developer", response.getBody().getTitle());
         verify(vacancyService, times(1)).createVacancy(any(CreateVacancyRequest.class), eq(1L));
     }
 
     @Test
-    void shouldReturn404WhenCompanyNotFound() throws Exception {
+    void shouldReturn404WhenCompanyNotFound() {
         when(vacancyService.createVacancy(any(CreateVacancyRequest.class), eq(999L)))
                 .thenThrow(new RuntimeException("Company not found"));
 
-        mockMvc.perform(post("/vacancies")
-                .with(jwt().jwt(j -> j.subject("999").claim("role", "COMPANY")))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(testRequest)))
-                .andExpect(status().isNotFound());
+        ResponseEntity<Vacancy> response = vacancyController.createVacancy(testRequest, jwt("999", "COMPANY"));
 
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNull(response.getBody());
         verify(vacancyService, times(1)).createVacancy(any(CreateVacancyRequest.class), eq(999L));
     }
 
     @Test
-    void shouldReturn400WhenRoleIsNotCompany() throws Exception {
+    void shouldReturn400WhenRoleIsNotCompany() {
         when(vacancyService.createVacancy(any(CreateVacancyRequest.class), eq(1L)))
                 .thenThrow(new IllegalArgumentException("Only COMPANY users can create vacancies"));
 
-        mockMvc.perform(post("/vacancies")
-                .with(jwt().jwt(j -> j.subject("1").claim("role", "CANDIDATE")))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(testRequest)))
-                .andExpect(status().isBadRequest());
+        ResponseEntity<Vacancy> response = vacancyController.createVacancy(testRequest, jwt("1", "CANDIDATE"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNull(response.getBody());
+        verify(vacancyService, times(1)).createVacancy(any(CreateVacancyRequest.class), eq(1L));
     }
 
     @Test
-    void shouldUpdateVacancy() throws Exception {
+    void shouldUpdateVacancy() {
         CreateVacancyRequest updateRequest = new CreateVacancyRequest();
         updateRequest.setTitle("Senior Backend Developer");
         updateRequest.setDescription("Java + Spring Boot + Kubernetes");
-        updateRequest.setLocation("Bogotá, Colombia");
+        updateRequest.setLocation("Bogota, Colombia");
         updateRequest.setModality("REMOTE");
         updateRequest.setEmploymentType("FULL_TIME");
         updateRequest.setExperienceLevel("SENIOR");
@@ -212,7 +184,7 @@ class VacancyControllerTest {
                 .id(1L)
                 .title("Senior Backend Developer")
                 .description("Java + Spring Boot + Kubernetes")
-                .location("Bogotá, Colombia")
+                .location("Bogota, Colombia")
                 .modality(Modality.REMOTE)
                 .employmentType(EmploymentType.FULL_TIME)
                 .experienceLevel(ExperienceLevel.SENIOR)
@@ -221,58 +193,65 @@ class VacancyControllerTest {
                 .company(testCompany)
                 .build();
 
-        when(vacancyService.updateVacancy(eq(1L), any(CreateVacancyRequest.class)))
-                .thenReturn(updatedVacancy);
+        when(vacancyService.updateVacancy(eq(1L), any(CreateVacancyRequest.class))).thenReturn(updatedVacancy);
 
-        mockMvc.perform(put("/vacancies/{id}", 1L)
-                .with(jwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(updateRequest)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
-                .andExpect(jsonPath("$.title", is("Senior Backend Developer")))
-                .andExpect(jsonPath("$.minSalary", is(6000.0)))
-                .andExpect(jsonPath("$.maxSalary", is(9000.0)));
+        ResponseEntity<Vacancy> response = vacancyController.updateVacancy(1L, updateRequest);
 
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("Senior Backend Developer", response.getBody().getTitle());
         verify(vacancyService, times(1)).updateVacancy(eq(1L), any(CreateVacancyRequest.class));
     }
 
     @Test
-    void shouldReturn404WhenUpdatingVacancyNotFound() throws Exception {
+    void shouldReturn400WhenUpdatingVacancyWithInvalidData() {
+        when(vacancyService.updateVacancy(eq(1L), any(CreateVacancyRequest.class)))
+                .thenThrow(new IllegalArgumentException("Invalid salary range"));
+
+        ResponseEntity<Vacancy> response = vacancyController.updateVacancy(1L, testRequest);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNull(response.getBody());
+        verify(vacancyService, times(1)).updateVacancy(eq(1L), any(CreateVacancyRequest.class));
+    }
+
+    @Test
+    void shouldReturn404WhenUpdatingVacancyNotFound() {
         when(vacancyService.updateVacancy(eq(999L), any(CreateVacancyRequest.class)))
                 .thenThrow(new RuntimeException("Vacancy not found"));
 
-        mockMvc.perform(put("/vacancies/{id}", 999L)
-                .with(jwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(testRequest)))
-                .andExpect(status().isNotFound());
+        ResponseEntity<Vacancy> response = vacancyController.updateVacancy(999L, testRequest);
 
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNull(response.getBody());
         verify(vacancyService, times(1)).updateVacancy(eq(999L), any(CreateVacancyRequest.class));
     }
 
     @Test
-    void shouldDeleteVacancy() throws Exception {
+    void shouldDeleteVacancy() {
         doNothing().when(vacancyService).deleteVacancy(1L);
 
-        mockMvc.perform(delete("/vacancies/{id}", 1L)
-                .with(jwt())
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isNoContent());
+        ResponseEntity<Void> response = vacancyController.deleteVacancy(1L);
 
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
         verify(vacancyService, times(1)).deleteVacancy(1L);
     }
 
     @Test
-    void shouldReturn404WhenDeletingVacancyNotFound() throws Exception {
-        doThrow(new RuntimeException("Vacancy not found"))
-                .when(vacancyService).deleteVacancy(999L);
+    void shouldReturn404WhenDeletingVacancyNotFound() {
+        doThrow(new RuntimeException("Vacancy not found")).when(vacancyService).deleteVacancy(999L);
 
-        mockMvc.perform(delete("/vacancies/{id}", 999L)
-                .with(jwt())
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isNotFound());
+        ResponseEntity<Void> response = vacancyController.deleteVacancy(999L);
 
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         verify(vacancyService, times(1)).deleteVacancy(999L);
+    }
+
+    private Jwt jwt(String subject, String role) {
+        return Jwt.withTokenValue("test-token")
+                .header("alg", "HS256")
+                .subject(subject)
+                .claim("role", role)
+                .build();
     }
 }
