@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import ieti.JobSwipe.dto.CreateVacancyRequest;
+import ieti.JobSwipe.dto.VacancyRecommendationResponse;
 import ieti.JobSwipe.model.Vacancy;
 import ieti.JobSwipe.service.VacancyService;
 import org.springframework.http.HttpStatus;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -38,6 +40,25 @@ public class VacancyController {
     @ApiResponse(responseCode = "200", description = "Vacancies retrieved successfully")
     public ResponseEntity<List<Vacancy>> getAllVacancies() {
         return ResponseEntity.ok(vacancyService.getAllVacancies());
+    }
+
+    @GetMapping("/recommended")
+    @Operation(summary = "Get recommended vacancies for authenticated candidate")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Recommendations retrieved successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid query params"),
+        @ApiResponse(responseCode = "404", description = "Candidate profile not found")
+    })
+    public ResponseEntity<List<VacancyRecommendationResponse>> getRecommendedVacancies(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "0") Float minScore,
+            @RequestParam(defaultValue = "20") Integer limit) {
+        if (minScore < 0 || minScore > 100 || limit <= 0) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Long userId = Long.parseLong(jwt.getSubject());
+        return ResponseEntity.ok(vacancyService.getRecommendedVacancies(userId, minScore, limit));
     }
 
     @GetMapping("/{id}")
