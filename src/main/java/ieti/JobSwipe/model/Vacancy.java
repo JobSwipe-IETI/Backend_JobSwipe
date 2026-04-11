@@ -61,6 +61,9 @@ public class Vacancy {
     @Column(nullable = false)
     private ExperienceLevel experienceLevel;
 
+    @Column
+    private String sector;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "vacancy_technologies", joinColumns = @JoinColumn(name = "vacancy_id"))
     @Column(name = "technology")

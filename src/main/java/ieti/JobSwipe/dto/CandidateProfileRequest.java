@@ -58,6 +58,9 @@ public class CandidateProfileRequest {
     @Size(max = 120, message = "Disponibilidad no puede superar 120 caracteres")
     private String availability;
 
+    @Size(max = 80, message = "El sector no puede superar 80 caracteres")
+    private String sector;
+
     @Pattern(
         regexp = "^$|^(https?://).+",
         message = "El GitHub debe ser una URL valida que inicie con http:// o https://")

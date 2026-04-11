@@ -1,14 +1,8 @@
 package ieti.JobSwipe.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import ieti.JobSwipe.dto.MatchingResponse;
-import ieti.JobSwipe.exception.ErrorMessages;
-import ieti.JobSwipe.exception.ProfileNotFoundException;
-import ieti.JobSwipe.exception.VacancyNotFoundException;
-import ieti.JobSwipe.model.Profile;
-import ieti.JobSwipe.model.Vacancy;
-import ieti.JobSwipe.repository.ProfileRepository;
-import ieti.JobSwipe.repository.VacancyRepository;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,8 +13,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import ieti.JobSwipe.dto.MatchingResponse;
+import ieti.JobSwipe.exception.ErrorMessages;
+import ieti.JobSwipe.exception.ProfileNotFoundException;
+import ieti.JobSwipe.exception.VacancyNotFoundException;
+import ieti.JobSwipe.model.Profile;
+import ieti.JobSwipe.model.Vacancy;
+import ieti.JobSwipe.repository.ProfileRepository;
+import ieti.JobSwipe.repository.VacancyRepository;
 
 @Service
 public class MatchingService {
@@ -94,6 +96,9 @@ public class MatchingService {
             sb.append("Location: ").append(profile.getLocation()).append("\n");
         }
         if (profile.getCandidateProfile() != null) {
+            if (profile.getCandidateProfile().getSector() != null) {
+                sb.append("Sector: ").append(profile.getCandidateProfile().getSector()).append("\n");
+            }
             if (profile.getCandidateProfile().getExpectedSalary() != null) {
                 sb.append("Expected Salary: ").append(profile.getCandidateProfile().getExpectedSalary()).append("\n");
             }
@@ -132,6 +137,9 @@ public class MatchingService {
         }
         if (vacancy.getExperienceLevel() != null) {
             sb.append("Experience Level: ").append(vacancy.getExperienceLevel()).append("\n");
+        }
+        if (vacancy.getSector() != null) {
+            sb.append("Sector: ").append(vacancy.getSector()).append("\n");
         }
         return sb.toString().isEmpty() ? "No vacancy information available" : sb.toString();
     }

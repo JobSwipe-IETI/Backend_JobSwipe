@@ -101,6 +101,7 @@ public class ProfileService {
         candidateProfile.setLanguages(request.getLanguages());
         candidateProfile.setExpectedSalary(request.getExpectedSalary());
         candidateProfile.setAvailability(request.getAvailability());
+        candidateProfile.setSector(request.getSector());
         candidateProfile.setGithubUrl(request.getGithubUrl());
         candidateProfile.setLinkedinUrl(request.getLinkedinUrl());
         candidateProfile.setPortfolioUrl(request.getPortfolioUrl());

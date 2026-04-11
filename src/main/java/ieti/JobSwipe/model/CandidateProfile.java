@@ -44,6 +44,9 @@ public class CandidateProfile {
     private String availability;
 
     @Column
+    private String sector;
+
+    @Column
     private String portfolioUrl;
 
     @Column

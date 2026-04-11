@@ -30,6 +30,8 @@ public class CreateVacancyRequest {
     @NotNull
     private String experienceLevel;
 
+    private String sector;
+
     private List<String> technologies;
 
     private List<String> softSkills;
