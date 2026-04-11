@@ -106,7 +106,7 @@ public class VacancyService {
     }
 
     public List<VacancyRecommendationResponse> getRecommendedVacancies(Long userId, Float minScore, Integer limit) {
-        float effectiveMinScore = 0f;
+        float effectiveMinScore = minScore != null ? minScore : 0f;
         int effectiveLimit = limit != null ? limit : 20;
 
         List<Vacancy> vacancies = vacancyRepository.findAll();
