@@ -1,6 +1,10 @@
 name: Build and deploy JAR app to Azure Web App - backendIeti
 
 on:
+  push:
+    branches:
+      - develop
+      - main
   pull_request:
     branches:
       - develop
