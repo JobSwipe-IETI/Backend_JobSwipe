@@ -2,9 +2,7 @@ package ieti.jobswipe.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ieti.jobswipe.controller.ProfileController;
 
-import ieti.jobswipe.controller.ProfileController;
 import ieti.jobswipe.dto.CandidateExperienceRequest;
 import ieti.jobswipe.dto.CandidateProfileRequest;
 import ieti.jobswipe.dto.CompanyProfileRequest;

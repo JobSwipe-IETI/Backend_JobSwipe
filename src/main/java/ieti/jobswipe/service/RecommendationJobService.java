@@ -1,7 +1,6 @@
 package ieti.jobswipe.service;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -9,6 +8,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.springframework.stereotype.Service;
 
@@ -29,22 +30,23 @@ public class RecommendationJobService {
         private final Long userId;
         private final Instant startedAt;
 
-        private volatile JobStatus status;
-        private volatile int processed;
-        private volatile int total;
-        private volatile String message;
-        private volatile String error;
-        private volatile List<VacancyRecommendationResponse> result;
+        private final AtomicReference<JobStatus> status;
+        private final AtomicInteger processed;
+        private final AtomicInteger total;
+        private final AtomicReference<String> message;
+        private final AtomicReference<String> error;
+        private final AtomicReference<List<VacancyRecommendationResponse>> result;
 
         public RecommendationJob(String jobId, Long userId) {
             this.jobId = jobId;
             this.userId = userId;
             this.startedAt = Instant.now();
-            this.status = JobStatus.RUNNING;
-            this.processed = 0;
-            this.total = 0;
-            this.message = "Iniciando...";
-            this.result = List.of();
+            this.status = new AtomicReference<>(JobStatus.RUNNING);
+            this.processed = new AtomicInteger(0);
+            this.total = new AtomicInteger(0);
+            this.message = new AtomicReference<>("Iniciando...");
+            this.error = new AtomicReference<>(null);
+            this.result = new AtomicReference<>(List.of());
         }
 
         public String getJobId() {
@@ -60,54 +62,59 @@ public class RecommendationJobService {
         }
 
         public JobStatus getStatus() {
-            return status;
+            return status.get();
         }
 
         public int getProcessed() {
-            return processed;
+            return processed.get();
         }
 
         public int getTotal() {
-            return total;
+            return total.get();
         }
 
         public String getMessage() {
-            return message;
+            return message.get();
         }
 
         public String getError() {
-            return error;
+            return error.get();
         }
 
         public List<VacancyRecommendationResponse> getResult() {
-            return result;
+            return result.get();
         }
 
         public int getProgressPercent() {
-            if (total <= 0) {
-                return status == JobStatus.COMPLETED ? 100 : 0;
+            int totalValue = total.get();
+            if (totalValue <= 0) {
+                return status.get() == JobStatus.COMPLETED ? 100 : 0;
             }
-            int value = (int) Math.round((processed * 100.0) / total);
+            int processedValue = processed.get();
+            int value = (int) Math.round((processedValue * 100.0) / totalValue);
             return Math.max(0, Math.min(100, value));
         }
 
         private void setProgress(int processed, int total, String message) {
-            this.processed = processed;
-            this.total = total;
-            this.message = message;
+            this.processed.set(processed);
+            this.total.set(total);
+            this.message.set(message);
         }
 
         private void complete(List<VacancyRecommendationResponse> result) {
-            this.result = new ArrayList<>(result);
-            this.status = JobStatus.COMPLETED;
-            this.message = "Recomendaciones listas";
-            this.processed = this.total > 0 ? this.total : this.processed;
+            this.result.set(List.copyOf(result));
+            this.status.set(JobStatus.COMPLETED);
+            this.message.set("Recomendaciones listas");
+            int totalValue = this.total.get();
+            if (totalValue > 0) {
+                this.processed.set(totalValue);
+            }
         }
 
         private void fail(String error) {
-            this.status = JobStatus.FAILED;
-            this.error = error;
-            this.message = "No se pudieron generar recomendaciones";
+            this.status.set(JobStatus.FAILED);
+            this.error.set(error);
+            this.message.set("No se pudieron generar recomendaciones");
         }
     }
 

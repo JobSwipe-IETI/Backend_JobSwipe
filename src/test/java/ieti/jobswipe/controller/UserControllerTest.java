@@ -2,8 +2,6 @@ package ieti.jobswipe.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ieti.jobswipe.controller.UserController;
-import ieti.jobswipe.controller.UserController;
 import ieti.jobswipe.dto.UserRequest;
 import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.User;

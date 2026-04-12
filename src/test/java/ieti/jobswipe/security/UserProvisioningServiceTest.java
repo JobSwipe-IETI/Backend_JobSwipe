@@ -3,10 +3,6 @@ package ieti.jobswipe.security;
 import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.User;
 import ieti.jobswipe.repository.UserRepository;
-import ieti.jobswipe.security.AuthenticatedUser;
-import ieti.jobswipe.security.UserProvisioningService;
-import ieti.jobswipe.security.AuthenticatedUser;
-import ieti.jobswipe.security.UserProvisioningService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

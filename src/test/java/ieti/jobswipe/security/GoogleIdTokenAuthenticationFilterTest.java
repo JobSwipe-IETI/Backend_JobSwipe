@@ -9,17 +9,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.web.AuthenticationEntryPoint;
 
-import ieti.jobswipe.security.AuthenticatedUser;
-import ieti.jobswipe.security.GoogleIdTokenAuthenticationFilter;
-import ieti.jobswipe.security.IdentityTokenVerifier;
-import ieti.jobswipe.security.InvalidIdentityTokenException;
-import ieti.jobswipe.security.UserProvisioningService;
 
-import ieti.jobswipe.security.AuthenticatedUser;
-import ieti.jobswipe.security.GoogleIdTokenAuthenticationFilter;
-import ieti.jobswipe.security.IdentityTokenVerifier;
-import ieti.jobswipe.security.InvalidIdentityTokenException;
-import ieti.jobswipe.security.UserProvisioningService;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

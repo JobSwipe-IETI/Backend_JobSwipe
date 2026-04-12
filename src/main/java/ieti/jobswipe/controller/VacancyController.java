@@ -33,6 +33,8 @@ import java.util.Optional;
 @Tag(name = "Vacancies", description = "Vacancy management endpoints")
 public class VacancyController {
 
+    private static final String MESSAGE_KEY = "message";
+
     private final VacancyService vacancyService;
     private final RecommendationJobService recommendationJobService;
 
@@ -119,7 +121,7 @@ public class VacancyController {
 
     @GetMapping("/recommended/jobs/{jobId}/result")
     @Operation(summary = "Get async recommendation job result")
-    public ResponseEntity<?> getRecommendedVacanciesJobResult(
+    public ResponseEntity<Object> getRecommendedVacanciesJobResult(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String jobId) {
         Long userId = Long.parseLong(jwt.getSubject());
@@ -130,11 +132,11 @@ public class VacancyController {
 
         RecommendationJobService.RecommendationJob job = jobOpt.get();
         if (job.getStatus() == RecommendationJobService.JobStatus.RUNNING) {
-            return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("message", "Job still running"));
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(MESSAGE_KEY, "Job still running"));
         }
         if (job.getStatus() == RecommendationJobService.JobStatus.FAILED) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                    .body(Map.of("message", job.getError() != null ? job.getError() : "Job failed"));
+                    .body(Map.of(MESSAGE_KEY, job.getError() != null ? job.getError() : "Job failed"));
         }
 
         return ResponseEntity.ok(job.getResult());
