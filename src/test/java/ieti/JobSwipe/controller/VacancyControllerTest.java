@@ -1,6 +1,7 @@
 package ieti.JobSwipe.controller;
 
 import ieti.JobSwipe.dto.CreateVacancyRequest;
+import ieti.JobSwipe.dto.VacancyRecommendationResponse;
 import ieti.JobSwipe.model.EmploymentType;
 import ieti.JobSwipe.model.ExperienceLevel;
 import ieti.JobSwipe.model.Modality;
@@ -26,6 +27,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyFloat;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
@@ -105,6 +109,50 @@ class VacancyControllerTest {
         assertEquals("Backend Developer", response.getBody().get(0).getTitle());
         assertEquals("Frontend Developer", response.getBody().get(1).getTitle());
         verify(vacancyService, times(1)).getAllVacancies();
+    }
+
+    @Test
+    void shouldGetRecommendedVacancies() {
+        List<VacancyRecommendationResponse> recommendations = Arrays.asList(
+                VacancyRecommendationResponse.builder()
+                        .vacancyId(1L)
+                        .title("Backend Developer")
+                        .location("Bogota, Colombia")
+                        .compatibilityPercentage(88.0f)
+                        .compatibilityLevel("high")
+                        .similarityScore(0.91)
+                        .feedback("Great fit")
+                        .build(),
+                VacancyRecommendationResponse.builder()
+                        .vacancyId(2L)
+                        .title("Frontend Developer")
+                        .location("Medellin, Colombia")
+                        .compatibilityPercentage(72.0f)
+                        .compatibilityLevel("medium")
+                        .similarityScore(0.74)
+                        .feedback("Good fit")
+                        .build());
+
+        when(vacancyService.getRecommendedVacancies(1L, 70.0f, 10)).thenReturn(recommendations);
+
+        ResponseEntity<List<VacancyRecommendationResponse>> response = vacancyController.getRecommendedVacancies(
+                jwt("1", "CANDIDATE"), 70.0f, 10);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(2, response.getBody().size());
+        assertEquals(88.0f, response.getBody().get(0).getCompatibilityPercentage());
+        verify(vacancyService, times(1)).getRecommendedVacancies(1L, 70.0f, 10);
+    }
+
+    @Test
+    void shouldReturn400WhenRecommendedParamsAreInvalid() {
+        ResponseEntity<List<VacancyRecommendationResponse>> response = vacancyController.getRecommendedVacancies(
+                jwt("1", "CANDIDATE"), -1.0f, 10);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNull(response.getBody());
+        verify(vacancyService, times(0)).getRecommendedVacancies(anyLong(), anyFloat(), anyInt());
     }
 
     @Test
