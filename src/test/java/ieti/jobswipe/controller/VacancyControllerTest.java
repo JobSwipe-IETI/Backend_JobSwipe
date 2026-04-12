@@ -101,16 +101,16 @@ class VacancyControllerTest {
     @Test
     void shouldGetAllVacancies() {
         List<Vacancy> vacancies = Arrays.asList(testVacancy, testVacancy2);
-        when(vacancyService.getAllVacancies()).thenReturn(vacancies);
+        when(vacancyService.getAllVacanciesForUser(1L)).thenReturn(vacancies);
 
-        ResponseEntity<List<Vacancy>> response = vacancyController.getAllVacancies();
+        ResponseEntity<List<Vacancy>> response = vacancyController.getAllVacancies(jwt("1", "CANDIDATE"));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(2, response.getBody().size());
         assertEquals("Backend Developer", response.getBody().get(0).getTitle());
         assertEquals("Frontend Developer", response.getBody().get(1).getTitle());
-        verify(vacancyService, times(1)).getAllVacancies();
+        verify(vacancyService, times(1)).getAllVacanciesForUser(1L);
     }
 
     @Test
