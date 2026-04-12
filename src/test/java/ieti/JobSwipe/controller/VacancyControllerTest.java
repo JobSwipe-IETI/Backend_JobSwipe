@@ -156,6 +156,26 @@ class VacancyControllerTest {
     }
 
     @Test
+    void shouldReturn400WhenRecommendedMinScoreExceedsMaximum() {
+        ResponseEntity<List<VacancyRecommendationResponse>> response = vacancyController.getRecommendedVacancies(
+                jwt("1", "CANDIDATE"), 101.0f, 10);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNull(response.getBody());
+        verify(vacancyService, times(0)).getRecommendedVacancies(anyLong(), anyFloat(), anyInt());
+    }
+
+    @Test
+    void shouldReturn400WhenRecommendedLimitIsNotPositive() {
+        ResponseEntity<List<VacancyRecommendationResponse>> response = vacancyController.getRecommendedVacancies(
+                jwt("1", "CANDIDATE"), 50.0f, 0);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNull(response.getBody());
+        verify(vacancyService, times(0)).getRecommendedVacancies(anyLong(), anyFloat(), anyInt());
+    }
+
+    @Test
     void shouldGetVacancyById() {
         when(vacancyService.getVacancyById(1L)).thenReturn(testVacancy);
 

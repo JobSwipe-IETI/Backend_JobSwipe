@@ -49,6 +49,28 @@ class GoogleIdTokenAuthenticationFilterTest {
     }
 
     @Test
+    void shouldContinueFilterChainWhenAuthorizationHeaderIsNotBearer() throws Exception {
+        IdentityTokenVerifier identityTokenVerifier = mock(IdentityTokenVerifier.class);
+        UserProvisioningService userProvisioningService = mock(UserProvisioningService.class);
+        AuthenticationEntryPoint authenticationEntryPoint = mock(AuthenticationEntryPoint.class);
+        GoogleIdTokenAuthenticationFilter filter = new GoogleIdTokenAuthenticationFilter(
+                identityTokenVerifier,
+                userProvisioningService,
+                authenticationEntryPoint);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Basic abc123");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        verify(identityTokenVerifier, never()).verify(any());
+        verify(authenticationEntryPoint, never()).commence(any(), any(), any());
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
     void shouldRejectBlankBearerToken() throws Exception {
         IdentityTokenVerifier identityTokenVerifier = mock(IdentityTokenVerifier.class);
         UserProvisioningService userProvisioningService = mock(UserProvisioningService.class);

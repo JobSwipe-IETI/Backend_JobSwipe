@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import ieti.JobSwipe.dto.UserRequest;
 import ieti.JobSwipe.model.User;
 import ieti.JobSwipe.service.UserService;
 
@@ -55,8 +56,8 @@ public class UserController {
     @PostMapping
     @Operation(summary = "Create a new user", description = "Create a new user in the system")
     @ApiResponse(responseCode = "201", description = "User created successfully")
-    public ResponseEntity<User> createUser(@RequestBody User user) {
-        User createdUser = userService.createUser(user);
+    public ResponseEntity<User> createUser(@RequestBody UserRequest userRequest) {
+        User createdUser = userService.createUser(toUser(userRequest));
         return ResponseEntity.status(HttpStatus.CREATED).body(createdUser);
     }
 
@@ -66,9 +67,9 @@ public class UserController {
         @ApiResponse(responseCode = "200", description = "User updated successfully"),
         @ApiResponse(responseCode = "404", description = "User not found")
     })
-    public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody User user) {
+    public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody UserRequest userRequest) {
         try {
-            return ResponseEntity.ok(userService.updateUser(id, user));
+            return ResponseEntity.ok(userService.updateUser(id, toUser(userRequest)));
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
@@ -87,5 +88,16 @@ public class UserController {
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
+    }
+
+    private User toUser(UserRequest userRequest) {
+        return User.builder()
+                .name(userRequest.getName())
+                .email(userRequest.getEmail())
+                .password(userRequest.getPassword())
+                .googleId(userRequest.getGoogleId())
+                .avatarUrl(userRequest.getAvatarUrl())
+                .role(userRequest.getRole())
+                .build();
     }
 }

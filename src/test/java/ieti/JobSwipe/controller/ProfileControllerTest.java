@@ -262,6 +262,27 @@ class ProfileControllerTest {
         verify(profileService, times(1)).upsertCompanyProfile(eq(1L), any(CompanyProfileRequest.class));
     }
 
+        @Test
+        void shouldUpdateCompanyProfileUsingPathUserIdWhenPrincipalIsNotJwt() {
+                CompanyProfileRequest request = new CompanyProfileRequest();
+                request.setCompanyName("Acme");
+                request.setCompanyDescription("Description long enough");
+                request.setNationality("Colombia");
+
+                Profile profile = Profile.builder().id(23L).professionalTitle("Acme").build();
+                when(profileService.upsertCompanyProfile(eq(1L), any(CompanyProfileRequest.class))).thenReturn(profile);
+
+                SecurityContextHolder.getContext().setAuthentication(
+                                new UsernamePasswordAuthenticationToken("plain-principal", null));
+
+                ResponseEntity<Profile> response = profileController.updateCompanyProfile(1L, request);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertEquals(23L, response.getBody().getId());
+                verify(profileService, never()).resolveEffectiveUserId(any(), any(), any(), any(), any(), any());
+                verify(profileService, times(1)).upsertCompanyProfile(eq(1L), any(CompanyProfileRequest.class));
+        }
+
     @Test
     void shouldReturn404WhenCreatingCandidateProfileFails() {
         CandidateProfileRequest request = new CandidateProfileRequest();
@@ -292,6 +313,21 @@ class ProfileControllerTest {
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
+
+        @Test
+        void shouldReturn404WhenUpdatingCompanyProfileFails() {
+                CompanyProfileRequest request = new CompanyProfileRequest();
+                request.setCompanyName("Acme");
+                request.setCompanyDescription("Description long enough");
+                request.setNationality("Colombia");
+
+                when(profileService.upsertCompanyProfile(eq(1L), any(CompanyProfileRequest.class)))
+                                .thenThrow(new RuntimeException("Profile not found"));
+
+                ResponseEntity<Profile> response = profileController.updateCompanyProfile(1L, request);
+
+                assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        }
 
     private Jwt jwtToken(String subject, String email, String name, String googleId, String avatarUrl) {
         return Jwt.withTokenValue("jwt-token")

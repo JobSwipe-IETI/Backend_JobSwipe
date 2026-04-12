@@ -137,8 +137,6 @@ class UserProvisioningServiceTest {
                 .role(Role.CANDIDATE)
                 .build();
 
-        existingUser.setName("John Doe");
-
         when(userRepository.findByGoogleId("google-subject-123")).thenReturn(Optional.of(existingUser));
         when(userRepository.save(any(User.class))).thenReturn(existingUser);
 
@@ -162,8 +160,6 @@ class UserProvisioningServiceTest {
                 .password(null)
                 .role(Role.CANDIDATE)
                 .build();
-
-        existingUser.setAvatarUrl("https://example.com/avatar.jpg");
 
         when(userRepository.findByGoogleId("google-subject-123")).thenReturn(Optional.of(existingUser));
         when(userRepository.save(any(User.class))).thenReturn(existingUser);
@@ -190,6 +186,67 @@ class UserProvisioningServiceTest {
 
         verify(userRepository, times(1)).findByGoogleId("google-subject-123");
         verify(userRepository, times(1)).findByEmail("john@example.com");
+        verify(userRepository, times(2)).save(any(User.class));
+    }
+
+    @Test
+    void shouldKeepExistingNameAndAvatarWhenTokenHasNullOptionalFields() {
+        AuthenticatedUser authenticatedUserWithoutOptionalFields = new AuthenticatedUser(
+                "google-subject-123",
+                "john@example.com",
+                null,
+                null);
+
+        User existingUser = User.builder()
+                .id(7L)
+                .name("Stored Name")
+                .email("john@example.com")
+                .googleId("google-subject-123")
+                .avatarUrl("https://example.com/stored-avatar.jpg")
+                .password(null)
+                .role(Role.CANDIDATE)
+                .build();
+
+        when(userRepository.findByGoogleId("google-subject-123")).thenReturn(Optional.of(existingUser));
+        when(userRepository.save(any(User.class))).thenReturn(existingUser);
+
+        User result = provisioningService.ensureUserExists(authenticatedUserWithoutOptionalFields);
+
+        assertNotNull(result);
+        assertEquals("Stored Name", result.getName());
+        assertEquals("https://example.com/stored-avatar.jpg", result.getAvatarUrl());
+        verify(userRepository, times(1)).findByGoogleId("google-subject-123");
+        verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    @Test
+    void shouldUseEmailAsNameWhenCreatingUserAndTokenNameIsNull() {
+        AuthenticatedUser userWithoutName = new AuthenticatedUser(
+                "google-subject-999",
+                "noname@example.com",
+                null,
+                "https://example.com/avatar.jpg");
+
+        User createdUser = User.builder()
+                .id(9L)
+                .name("noname@example.com")
+                .email("noname@example.com")
+                .googleId("google-subject-999")
+                .avatarUrl("https://example.com/avatar.jpg")
+                .password(null)
+                .role(Role.CANDIDATE)
+                .build();
+
+        when(userRepository.findByGoogleId("google-subject-999")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("noname@example.com")).thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenReturn(createdUser);
+
+        User result = provisioningService.ensureUserExists(userWithoutName);
+
+        assertNotNull(result);
+        assertEquals("noname@example.com", result.getName());
+        verify(userRepository, times(1)).findByGoogleId("google-subject-999");
+        verify(userRepository, times(1)).findByEmail("noname@example.com");
         verify(userRepository, times(2)).save(any(User.class));
     }
 }

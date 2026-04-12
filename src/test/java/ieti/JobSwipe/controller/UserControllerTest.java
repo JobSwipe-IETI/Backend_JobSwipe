@@ -2,7 +2,7 @@ package ieti.JobSwipe.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ieti.JobSwipe.controller.UserController;
+import ieti.JobSwipe.dto.UserRequest;
 import ieti.JobSwipe.model.Role;
 import ieti.JobSwipe.model.User;
 import ieti.JobSwipe.service.UserService;
@@ -134,12 +134,11 @@ class UserControllerTest {
 
     @Test
     void shouldCreateUser() throws Exception {
-        User userRequest = User.builder()
-                .name("Jane Smith")
-                .email("jane@example.com")
-                .password("newpassword")
-                .role(Role.COMPANY)
-                .build();
+                UserRequest userRequest = new UserRequest();
+                userRequest.setName("Jane Smith");
+                userRequest.setEmail("jane@example.com");
+                userRequest.setPassword("newpassword");
+                userRequest.setRole(Role.COMPANY);
 
         User createdUser = User.builder()
                 .id(2L)
@@ -167,12 +166,11 @@ class UserControllerTest {
 
     @Test
     void shouldUpdateUser() throws Exception {
-        User updateRequest = User.builder()
-                .name("John Updated")
-                .email("john.updated@example.com")
-                .password("newpassword123")
-                .role(Role.COMPANY)
-                .build();
+                UserRequest updateRequest = new UserRequest();
+                updateRequest.setName("John Updated");
+                updateRequest.setEmail("john.updated@example.com");
+                updateRequest.setPassword("newpassword123");
+                updateRequest.setRole(Role.COMPANY);
 
         User updatedUser = User.builder()
                 .id(1L)
@@ -200,12 +198,11 @@ class UserControllerTest {
 
     @Test
     void shouldReturn404WhenUpdatingNonExistingUser() throws Exception {
-        User updateRequest = User.builder()
-                .name("Someone")
-                .email("someone@example.com")
-                .password("password")
-                .role(Role.CANDIDATE)
-                .build();
+                UserRequest updateRequest = new UserRequest();
+                updateRequest.setName("Someone");
+                updateRequest.setEmail("someone@example.com");
+                updateRequest.setPassword("password");
+                updateRequest.setRole(Role.CANDIDATE);
 
         when(userService.updateUser(eq(999L), any(User.class)))
                 .thenThrow(new RuntimeException("User not found"));

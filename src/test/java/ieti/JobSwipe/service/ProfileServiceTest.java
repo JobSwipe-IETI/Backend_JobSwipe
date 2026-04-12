@@ -1,5 +1,7 @@
 package ieti.JobSwipe.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import ieti.JobSwipe.dto.CandidateProfileRequest;
 import ieti.JobSwipe.dto.CandidateExperienceRequest;
 import ieti.JobSwipe.dto.CompanyProfileRequest;
@@ -27,11 +29,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 
 @ExtendWith(MockitoExtension.class)
 class ProfileServiceTest {
@@ -171,6 +174,25 @@ class ProfileServiceTest {
     }
 
     @Test
+    void shouldReturnProfileWhenLobFieldsAreNull() {
+        Profile profile = Profile.builder()
+                .id(21L)
+                .skills(null)
+                .experience(null)
+                .education(null)
+                .build();
+
+        when(profileRepository.findByUserId(21L)).thenReturn(Optional.of(profile));
+
+        Profile result = profileService.getProfileByUserId(21L);
+
+        assertEquals(21L, result.getId());
+        assertNull(result.getSkills());
+        assertNull(result.getExperience());
+        assertNull(result.getEducation());
+    }
+
+    @Test
     void shouldDeleteExistingCompanyProfileWhenUpsertingCandidateProfile() {
         CandidateProfileRequest request = new CandidateProfileRequest();
         request.setDisplayName("John Doe");
@@ -291,4 +313,198 @@ class ProfileServiceTest {
         assertEquals("User not found", exception.getMessage());
         verify(userRepository, never()).save(any(User.class));
     }
+
+    @Test
+    void shouldThrowWhenUpsertingCandidateProfileAndUserDoesNotExist() {
+        CandidateProfileRequest request = new CandidateProfileRequest();
+        request.setDisplayName("John Doe");
+        request.setProfessionalTitle("Backend Developer");
+        request.setSummary("Java developer");
+        request.setNationality("Colombia");
+
+        when(userRepository.findById(404L)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> profileService.upsertCandidateProfile(404L, request));
+
+        assertEquals("User not found", exception.getMessage());
+        verify(profileRepository, never()).save(any(Profile.class));
+    }
+
+    @Test
+    void shouldThrowWhenUpsertingCompanyProfileAndUserDoesNotExist() {
+        CompanyProfileRequest request = new CompanyProfileRequest();
+        request.setCompanyName("Acme");
+        request.setCompanyDescription("Tech company");
+        request.setNationality("Colombia");
+
+        when(userRepository.findById(405L)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> profileService.upsertCompanyProfile(405L, request));
+
+        assertEquals("User not found", exception.getMessage());
+        verify(profileRepository, never()).save(any(Profile.class));
+    }
+
+    @Test
+    void shouldCreateUserWithNullGoogleIdWhenClaimIsBlank() {
+        User recreatedUser = User.builder()
+                .id(10L)
+                .name("john@example.com")
+                .email("john@example.com")
+                .googleId(null)
+                .avatarUrl("https://avatar")
+                .role(Role.CANDIDATE)
+                .build();
+
+        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenReturn(recreatedUser);
+
+        Long effectiveUserId = profileService.resolveEffectiveUserId(
+                null,
+                "john@example.com",
+                "   ",
+                "   ",
+                "https://avatar",
+                Role.CANDIDATE);
+
+        assertEquals(10L, effectiveUserId);
+        verify(userRepository, never()).findByGoogleId(any());
+        verify(userRepository, times(1)).findByEmail("john@example.com");
+        verify(userRepository, times(1)).save(any(User.class));
+    }
+
+        @Test
+        void shouldResolveByEmailWhenRequestedUserIdIsNullAndGoogleIdBlank() {
+        User emailUser = User.builder().id(8L).email("john@example.com").build();
+
+        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(emailUser));
+
+        Long effectiveUserId = profileService.resolveEffectiveUserId(
+            null,
+            "john@example.com",
+            "  ",
+            "John",
+            null,
+            Role.CANDIDATE);
+
+        assertEquals(8L, effectiveUserId);
+        verify(userRepository, never()).findById(any());
+        verify(userRepository, never()).findByGoogleId(any());
+        verify(userRepository, times(1)).findByEmail("john@example.com");
+        }
+
+        @Test
+        void shouldCreateUserUsingEmailAsNameWhenNameIsBlank() {
+        User recreatedUser = User.builder()
+            .id(9L)
+            .name("john@example.com")
+            .email("john@example.com")
+            .googleId(null)
+            .avatarUrl(null)
+            .role(Role.CANDIDATE)
+            .build();
+
+        when(userRepository.findByGoogleId("google-blank")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenReturn(recreatedUser);
+
+        Long effectiveUserId = profileService.resolveEffectiveUserId(
+            null,
+            "john@example.com",
+            "google-blank",
+            "   ",
+            "   ",
+            Role.CANDIDATE);
+
+        assertEquals(9L, effectiveUserId);
+        verify(userRepository, times(1)).save(any(User.class));
+        }
+
+        @Test
+        void shouldReuseExistingCandidateProfileWhenUpsertingCandidate() {
+        CandidateProfileRequest request = new CandidateProfileRequest();
+        request.setDisplayName("John Doe");
+        request.setProfessionalTitle("Backend Developer");
+        request.setSummary("Java developer");
+        request.setNationality("Colombia");
+        request.setSector("Technology");
+
+        CandidateProfile existingCandidate = CandidateProfile.builder()
+            .id(70L)
+            .languages("English")
+            .build();
+        Profile existingProfile = Profile.builder()
+            .id(11L)
+            .user(testUser)
+            .candidateProfile(existingCandidate)
+            .build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(profileRepository.findByUserId(1L)).thenReturn(Optional.of(existingProfile));
+        when(profileRepository.save(any(Profile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(candidateProfileRepository.save(any(CandidateProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Profile result = profileService.upsertCandidateProfile(1L, request);
+
+        assertNotNull(result.getCandidateProfile());
+        assertEquals(70L, result.getCandidateProfile().getId());
+        verify(candidateProfileRepository, never()).delete(any());
+        }
+
+        @Test
+        void shouldReuseExistingCompanyProfileWhenUpsertingCompany() {
+        CompanyProfileRequest request = new CompanyProfileRequest();
+        request.setCompanyName("Acme SAS");
+        request.setCompanyDescription("Tech company");
+        request.setNationality("Colombia");
+
+        CompanyProfile existingCompany = CompanyProfile.builder()
+            .id(80L)
+            .companyName("Old Co")
+            .build();
+        Profile existingProfile = Profile.builder()
+            .id(12L)
+            .user(testUser)
+            .companyProfile(existingCompany)
+            .build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(profileRepository.findByUserId(1L)).thenReturn(Optional.of(existingProfile));
+        when(profileRepository.save(any(Profile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(companyProfileRepository.save(any(CompanyProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Profile result = profileService.upsertCompanyProfile(1L, request);
+
+        assertNotNull(result.getCompanyProfile());
+        assertEquals(80L, result.getCompanyProfile().getId());
+        verify(companyProfileRepository, never()).delete(any());
+        }
+
+        @Test
+        void shouldThrowIllegalArgumentWhenSkillsSerializationFails() throws Exception {
+        ProfileService serviceSpy = spy(profileService);
+        ObjectMapper failingMapper = org.mockito.Mockito.mock(ObjectMapper.class);
+        doThrow(new JsonProcessingException("boom") { }).when(failingMapper).writeValueAsString(any());
+
+        java.lang.reflect.Field objectMapperField = ProfileService.class.getDeclaredField("objectMapper");
+        objectMapperField.setAccessible(true);
+        objectMapperField.set(serviceSpy, failingMapper);
+
+        CandidateProfileRequest request = new CandidateProfileRequest();
+        request.setDisplayName("John Doe");
+        request.setProfessionalTitle("Backend Developer");
+        request.setSummary("Java developer");
+        request.setNationality("Colombia");
+        request.setSkills(java.util.List.of("Java"));
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(profileRepository.findByUserId(1L)).thenReturn(Optional.empty());
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+            () -> serviceSpy.upsertCandidateProfile(1L, request));
+
+        assertEquals("Unable to serialize profile payload", exception.getMessage());
+        }
 }

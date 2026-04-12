@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -94,6 +95,28 @@ class GoogleIdentityTokenVerifierTest {
         });
 
         assertEquals("Google identity token does not contain email", exception.getMessage());
+    }
+
+    @Test
+    void shouldAllowMissingOptionalNameAndPictureClaims() throws Exception {
+        String validTokenWithoutOptionalClaims = "valid.token.without.optional.claims";
+        GoogleIdToken mockToken = mock(GoogleIdToken.class);
+        GoogleIdToken.Payload mockPayload = mock(GoogleIdToken.Payload.class);
+
+        when(mockToken.getPayload()).thenReturn(mockPayload);
+        when(mockPayload.getSubject()).thenReturn("google-subject-456");
+        when(mockPayload.getEmail()).thenReturn("jane@example.com");
+        when(mockPayload.get("name")).thenReturn(null);
+        when(mockPayload.get("picture")).thenReturn(null);
+        when(mockGoogleVerifier.verify(validTokenWithoutOptionalClaims)).thenReturn(mockToken);
+
+        AuthenticatedUser result = identityTokenVerifier.verify(validTokenWithoutOptionalClaims);
+
+        assertNotNull(result);
+        assertEquals("google-subject-456", result.subject());
+        assertEquals("jane@example.com", result.email());
+        assertNull(result.name());
+        assertNull(result.picture());
     }
 
     @Test

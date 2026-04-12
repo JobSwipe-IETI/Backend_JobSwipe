@@ -13,8 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import ieti.JobSwipe.dto.MatchingResponse;
 import ieti.JobSwipe.exception.ErrorMessages;
 import ieti.JobSwipe.exception.ProfileNotFoundException;
@@ -31,7 +29,6 @@ public class MatchingService {
     private final ProfileRepository profileRepository;
     private final VacancyRepository vacancyRepository;
     private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${app.ai-service.base-url}")
     private String aiServiceBaseUrl;
@@ -77,39 +74,32 @@ public class MatchingService {
 
     private String buildCandidateText(Profile profile) {
         StringBuilder sb = new StringBuilder();
-        if (profile.getProfessionalTitle() != null) {
-            sb.append("Professional Title: ").append(profile.getProfessionalTitle()).append("\n");
-        }
-        if (profile.getSummary() != null) {
-            sb.append("Summary: ").append(profile.getSummary()).append("\n");
-        }
-        if (profile.getSkills() != null) {
-            sb.append("Skills: ").append(profile.getSkills()).append("\n");
-        }
-        if (profile.getExperience() != null) {
-            sb.append("Experience: ").append(profile.getExperience()).append("\n");
-        }
-        if (profile.getEducation() != null) {
-            sb.append("Education: ").append(profile.getEducation()).append("\n");
-        }
-        if (profile.getLocation() != null) {
-            sb.append("Location: ").append(profile.getLocation()).append("\n");
-        }
-        if (profile.getCandidateProfile() != null) {
-            if (profile.getCandidateProfile().getSector() != null) {
-                sb.append("Sector: ").append(profile.getCandidateProfile().getSector()).append("\n");
-            }
-            if (profile.getCandidateProfile().getExpectedSalary() != null) {
-                sb.append("Expected Salary: ").append(profile.getCandidateProfile().getExpectedSalary()).append("\n");
-            }
-            if (profile.getCandidateProfile().getAvailability() != null) {
-                sb.append("Availability: ").append(profile.getCandidateProfile().getAvailability()).append("\n");
-            }
-            if (profile.getCandidateProfile().getLanguages() != null) {
-                sb.append("Languages: ").append(profile.getCandidateProfile().getLanguages()).append("\n");
-            }
-        }
+        appendIfPresent(sb, "Professional Title", profile.getProfessionalTitle());
+        appendIfPresent(sb, "Summary", profile.getSummary());
+        appendIfPresent(sb, "Skills", profile.getSkills());
+        appendIfPresent(sb, "Experience", profile.getExperience());
+        appendIfPresent(sb, "Education", profile.getEducation());
+        appendIfPresent(sb, "Location", profile.getLocation());
+        appendCandidateDetails(sb, profile);
+
         return sb.toString().isEmpty() ? "No candidate information available" : sb.toString();
+    }
+
+    private void appendCandidateDetails(StringBuilder sb, Profile profile) {
+        if (profile.getCandidateProfile() == null) {
+            return;
+        }
+
+        appendIfPresent(sb, "Sector", profile.getCandidateProfile().getSector());
+        appendIfPresent(sb, "Expected Salary", profile.getCandidateProfile().getExpectedSalary());
+        appendIfPresent(sb, "Availability", profile.getCandidateProfile().getAvailability());
+        appendIfPresent(sb, "Languages", profile.getCandidateProfile().getLanguages());
+    }
+
+    private void appendIfPresent(StringBuilder sb, String label, Object value) {
+        if (value != null) {
+            sb.append(label).append(": ").append(value).append("\n");
+        }
     }
 
     private String buildVacancyText(Vacancy vacancy) {

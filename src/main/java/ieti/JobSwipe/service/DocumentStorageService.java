@@ -96,10 +96,7 @@ public class DocumentStorageService {
         try {
             byte[] bytes = document.getBytes();
 
-            try (S3Client s3Client = S3Client.builder()
-                    .region(Region.of(s3Region))
-                    .credentialsProvider(DefaultCredentialsProvider.create())
-                    .build()) {
+            try (S3Client s3Client = createS3Client()) {
                 PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                         .bucket(s3Bucket)
                         .key(objectKey)
@@ -118,6 +115,13 @@ public class DocumentStorageService {
         } catch (IOException exception) {
             throw new RuntimeException("Failed to store document", exception);
         }
+    }
+
+    protected S3Client createS3Client() {
+        return S3Client.builder()
+                .region(Region.of(s3Region))
+                .credentialsProvider(DefaultCredentialsProvider.create())
+                .build();
     }
 
     private String normalizePrefix(String prefix) {

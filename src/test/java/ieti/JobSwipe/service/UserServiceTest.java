@@ -154,4 +154,28 @@ class UserServiceTest {
         verify(userRepository, times(1)).findById(999L);
         verify(userRepository, times(0)).delete(any(User.class));
     }
+
+    @Test
+    void shouldUpdateUserRoleSuccessfully() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User updated = userService.updateUserRole(1L, Role.COMPANY);
+
+        assertNotNull(updated);
+        assertEquals(Role.COMPANY, updated.getRole());
+        verify(userRepository, times(1)).findById(1L);
+        verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    @Test
+    void shouldThrowWhenUpdatingUserRoleForNonExistingUser() {
+        when(userRepository.findById(404L)).thenReturn(Optional.empty());
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> userService.updateUserRole(404L, Role.COMPANY));
+
+        assertEquals("User not found", ex.getMessage());
+        verify(userRepository, times(1)).findById(404L);
+        verify(userRepository, times(0)).save(any(User.class));
+    }
 }

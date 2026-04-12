@@ -135,6 +135,25 @@ class AuthControllerTest {
         }
 
         @Test
+        void shouldThrowBadRequestWhenIdTokenIsBlank() throws Exception {
+                AuthController.GoogleAuthRequest request = new AuthController.GoogleAuthRequest("   ", null);
+
+                mockMvc.perform(post("/api/auth/google")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        void shouldThrowBadRequestWhenGoogleRequestIsNull() {
+                ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                                () -> authController.authenticateWithGoogle(null));
+
+                assertEquals(400, exception.getStatusCode().value());
+                assertEquals("400 BAD_REQUEST \"Google idToken is required\"", exception.getMessage());
+        }
+
+        @Test
         void shouldCreateNewUserOnFirstLogin() throws Exception {
                 String validIdToken = "valid.google.token";
                 AuthController.GoogleAuthRequest request = new AuthController.GoogleAuthRequest(validIdToken, null);
