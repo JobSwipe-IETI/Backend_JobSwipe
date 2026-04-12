@@ -1,6 +1,11 @@
 package ieti.JobSwipe.config;
 
-import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,12 +27,9 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import ieti.JobSwipe.security.RestAuthenticationEntryPoint;
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
+import ieti.JobSwipe.security.RestAuthenticationEntryPoint;
 
 @Configuration
 @EnableWebSecurity

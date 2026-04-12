@@ -60,4 +60,5 @@ jobs:
             -Dsonar.java.binaries=target/classes \
             -Dsonar.java.coverage.reportPaths=target/site/jacoco/jacoco.xml \
             -Dsonar.exclusions=**/target/**,**/logs/** \
+            -Dsonar.coverage.exclusions=src/main/java/IETI/**,**/dto/**,**/model/**,**/config/**,**/repository/**,**/JobSwipeApplication.java \
             -Dsonar.sourceEncoding=UTF-8

@@ -17,4 +17,8 @@ public class ErrorMessages {
     
     // Company messages
     public static final String COMPANY_NOT_FOUND = "Company not found";
+
+    // Profile messages
+    public static final String PROFILE_NOT_FOUND = "Profile not found";
+    public static final String PROFILE_CREATION_FAILED = "Profile creation failed";
 }

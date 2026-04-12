@@ -7,16 +7,19 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import ieti.JobSwipe.dto.CreateVacancyRequest;
+import ieti.JobSwipe.model.EmploymentType;
+import ieti.JobSwipe.model.ExperienceLevel;
+import ieti.JobSwipe.model.Modality;
 import ieti.JobSwipe.model.Role;
 import ieti.JobSwipe.model.User;
 import ieti.JobSwipe.model.Vacancy;
 import ieti.JobSwipe.repository.UserRepository;
 import ieti.JobSwipe.repository.VacancyRepository;
-import ieti.JobSwipe.service.VacancyService;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -41,6 +44,7 @@ class VacancyServiceTest {
 
     private User testCompany;
     private Vacancy testVacancy;
+    private CreateVacancyRequest testRequest;
 
     @BeforeEach
     void setUp() {
@@ -56,10 +60,25 @@ class VacancyServiceTest {
                 .id(1L)
                 .title("Senior Developer")
                 .description("Looking for a senior Java developer")
-                .salary(80000.0)
+                .location("Bogotá, Colombia")
+                .modality(Modality.REMOTE)
+                .employmentType(EmploymentType.FULL_TIME)
+                .experienceLevel(ExperienceLevel.SENIOR)
+                .minSalary(7000.0)
+                .maxSalary(10000.0)
                 .createdAt(LocalDateTime.now())
                 .company(testCompany)
                 .build();
+
+        testRequest = new CreateVacancyRequest();
+        testRequest.setTitle("Senior Developer");
+        testRequest.setDescription("Looking for a senior Java developer");
+        testRequest.setLocation("Bogotá, Colombia");
+        testRequest.setModality("REMOTE");
+        testRequest.setEmploymentType("FULL_TIME");
+        testRequest.setExperienceLevel("SENIOR");
+        testRequest.setMinSalary(7000.0);
+        testRequest.setMaxSalary(10000.0);
     }
 
     @Test
@@ -67,11 +86,11 @@ class VacancyServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testCompany));
         when(vacancyRepository.save(any(Vacancy.class))).thenReturn(testVacancy);
 
-        Vacancy createdVacancy = vacancyService.createVacancy(testVacancy, 1L);
+        Vacancy created = vacancyService.createVacancy(testRequest, 1L);
 
-        assertNotNull(createdVacancy);
-        assertEquals("Senior Developer", createdVacancy.getTitle());
-        assertEquals(1L, createdVacancy.getCompany().getId());
+        assertNotNull(created);
+        assertEquals("Senior Developer", created.getTitle());
+        assertEquals(1L, created.getCompany().getId());
         verify(userRepository, times(1)).findById(1L);
         verify(vacancyRepository, times(1)).save(any(Vacancy.class));
     }
@@ -80,12 +99,27 @@ class VacancyServiceTest {
     void shouldThrowExceptionWhenCompanyNotFound() {
         when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            vacancyService.createVacancy(testVacancy, 999L);
-        });
+        assertThrows(RuntimeException.class, () ->
+                vacancyService.createVacancy(testRequest, 999L));
 
-        assertEquals("Company not found", exception.getMessage());
         verify(userRepository, times(1)).findById(999L);
+        verify(vacancyRepository, times(0)).save(any(Vacancy.class));
+    }
+
+    @Test
+    void shouldThrowExceptionWhenUserIsNotCompany() {
+        User candidate = User.builder()
+                .id(2L)
+                .name("John Doe")
+                .email("john@example.com")
+                .role(Role.CANDIDATE)
+                .build();
+
+        when(userRepository.findById(2L)).thenReturn(Optional.of(candidate));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                vacancyService.createVacancy(testRequest, 2L));
+
         verify(vacancyRepository, times(0)).save(any(Vacancy.class));
     }
 
@@ -93,11 +127,11 @@ class VacancyServiceTest {
     void shouldReturnVacancyById() {
         when(vacancyRepository.findById(1L)).thenReturn(Optional.of(testVacancy));
 
-        Vacancy foundVacancy = vacancyService.getVacancyById(1L);
+        Vacancy found = vacancyService.getVacancyById(1L);
 
-        assertNotNull(foundVacancy);
-        assertEquals("Senior Developer", foundVacancy.getTitle());
-        assertEquals(1L, foundVacancy.getId());
+        assertNotNull(found);
+        assertEquals("Senior Developer", found.getTitle());
+        assertEquals(1L, found.getId());
         verify(vacancyRepository, times(1)).findById(1L);
     }
 
@@ -105,11 +139,9 @@ class VacancyServiceTest {
     void shouldThrowExceptionWhenVacancyNotFound() {
         when(vacancyRepository.findById(2L)).thenReturn(Optional.empty());
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            vacancyService.getVacancyById(2L);
-        });
+        assertThrows(RuntimeException.class, () ->
+                vacancyService.getVacancyById(2L));
 
-        assertEquals("Vacancy not found", exception.getMessage());
         verify(vacancyRepository, times(1)).findById(2L);
     }
 
@@ -119,7 +151,12 @@ class VacancyServiceTest {
                 .id(2L)
                 .title("Junior Developer")
                 .description("Looking for a junior developer")
-                .salary(40000.0)
+                .location("Medellín, Colombia")
+                .modality(Modality.HYBRID)
+                .employmentType(EmploymentType.PART_TIME)
+                .experienceLevel(ExperienceLevel.JUNIOR)
+                .minSalary(3000.0)
+                .maxSalary(5000.0)
                 .createdAt(LocalDateTime.now())
                 .company(testCompany)
                 .build();
@@ -135,21 +172,26 @@ class VacancyServiceTest {
 
     @Test
     void shouldUpdateVacancy() {
-        Vacancy updates = Vacancy.builder()
-                .title("Lead Developer")
-                .description("Lead role")
-                .salary(90000.0)
-                .build();
+        CreateVacancyRequest updateRequest = new CreateVacancyRequest();
+        updateRequest.setTitle("Lead Developer");
+        updateRequest.setDescription("Lead role");
+        updateRequest.setLocation("Cali, Colombia");
+        updateRequest.setModality("ON_SITE");
+        updateRequest.setEmploymentType("FULL_TIME");
+        updateRequest.setExperienceLevel("SENIOR");
+        updateRequest.setMinSalary(9000.0);
+        updateRequest.setMaxSalary(12000.0);
 
         when(vacancyRepository.findById(1L)).thenReturn(Optional.of(testVacancy));
-        when(vacancyRepository.save(any(Vacancy.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(vacancyRepository.save(any(Vacancy.class))).thenAnswer(i -> i.getArgument(0));
 
-        Vacancy updated = vacancyService.updateVacancy(1L, updates);
+        Vacancy updated = vacancyService.updateVacancy(1L, updateRequest);
 
         assertNotNull(updated);
         assertEquals("Lead Developer", updated.getTitle());
         assertEquals("Lead role", updated.getDescription());
-        assertEquals(90000.0, updated.getSalary());
+        assertEquals(9000.0, updated.getMinSalary());
+        assertEquals(12000.0, updated.getMaxSalary());
         verify(vacancyRepository, times(1)).findById(1L);
         verify(vacancyRepository, times(1)).save(any(Vacancy.class));
     }

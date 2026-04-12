@@ -2,6 +2,7 @@ package ieti.JobSwipe.service;
 
 import org.springframework.stereotype.Service;
 
+import ieti.JobSwipe.model.Role;
 import ieti.JobSwipe.model.User;
 import ieti.JobSwipe.repository.UserRepository;
 import ieti.JobSwipe.exception.ErrorMessages;
@@ -43,6 +44,12 @@ public class UserService {
         existingUser.setRole(user.getRole());
 
         return userRepository.save(existingUser);
+    }
+
+    public User updateUserRole(Long userId, Role role) {
+        User user = getUserById(userId);
+        user.setRole(role);
+        return userRepository.save(user);
     }
 
     public void deleteUser(Long id) {

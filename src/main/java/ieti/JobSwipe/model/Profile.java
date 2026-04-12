@@ -2,18 +2,18 @@ package ieti.JobSwipe.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.CascadeType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -23,40 +23,56 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "users")
+@Table(name = "profiles")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class User {
+public class Profile {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)
-    private String name;
+    private String professionalTitle;
 
-    @Column(nullable = false, unique = true)
-    private String email;
+    @Lob
+    @Column(nullable = false)
+    private String summary;
 
-    @Column(nullable = true)
-    private String password;
+    @Lob
+    private String skills;
 
-    @Column(unique = true)
-    private String googleId;
+    @Lob
+    private String experience;
+
+    @Lob
+    private String education;
 
     @Column
-    private String avatarUrl;
+    private String location;
 
-    @Enumerated(EnumType.STRING)
+    @Column
+    private String nationality;
+
+    @Column
+    private String phoneNumber;
+
     @Column(nullable = false)
-    private Role role;
+    private Boolean onboardingCompleted;
 
-    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
     @JsonIgnore
-    private Profile profile;
+    private User user;
+
+    @OneToOne(mappedBy = "profile", cascade = CascadeType.ALL, orphanRemoval = true)
+    private CandidateProfile candidateProfile;
+
+    @OneToOne(mappedBy = "profile", cascade = CascadeType.ALL, orphanRemoval = true)
+    private CompanyProfile companyProfile;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -69,6 +85,9 @@ public class User {
         LocalDateTime now = LocalDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;
+        if (this.onboardingCompleted == null) {
+            this.onboardingCompleted = false;
+        }
     }
 
     @PreUpdate

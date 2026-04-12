@@ -9,6 +9,7 @@ import ieti.JobSwipe.security.IdentityTokenVerifier;
 import ieti.JobSwipe.security.InvalidIdentityTokenException;
 import ieti.JobSwipe.security.JwtTokenService;
 import ieti.JobSwipe.security.UserProvisioningService;
+import ieti.JobSwipe.service.UserService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,18 +18,26 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 @ExtendWith(MockitoExtension.class)
 class AuthControllerTest {
@@ -41,6 +50,9 @@ class AuthControllerTest {
 
         @Mock
         private JwtTokenService jwtTokenService;
+
+        @Mock
+        private UserService userService;
 
         @InjectMocks
         private AuthController authController;
@@ -176,5 +188,59 @@ class AuthControllerTest {
                                 .andExpect(jsonPath("$.error", is("Invalid Google identity token")));
 
                 verify(identityTokenVerifier, times(1)).verify(invalidIdToken);
+        }
+
+        @Test
+        void shouldUpdateAuthenticatedUserRole() {
+                User updatedUser = User.builder()
+                                .id(1L)
+                                .name("John Doe")
+                                .email("john@example.com")
+                                .googleId("google-subject-123")
+                                .avatarUrl("https://example.com/avatar.jpg")
+                                .role(Role.COMPANY)
+                                .build();
+                AuthController.RoleUpdateRequest request = new AuthController.RoleUpdateRequest("COMPANY");
+
+                when(userService.updateUserRole(1L, Role.COMPANY)).thenReturn(updatedUser);
+                when(jwtTokenService.generateToken(updatedUser)).thenReturn(testTokenPayload);
+
+                AuthController.AuthTokenResponse response = authController
+                                .updateMyRole(request, jwt("1", "john@example.com", "John Doe"))
+                                .getBody();
+
+                assertEquals("COMPANY", response.user().role());
+                assertEquals("jwt-token-123", response.accessToken());
+                verify(userService, times(1)).updateUserRole(1L, Role.COMPANY);
+                verify(jwtTokenService, times(1)).generateToken(updatedUser);
+        }
+
+        @Test
+        void shouldRejectInvalidRoleUpdate() {
+                AuthController.RoleUpdateRequest request = new AuthController.RoleUpdateRequest("INVALID");
+
+                ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                                () -> authController.updateMyRole(request, jwt("1", "john@example.com", "John Doe")));
+
+                assertEquals(400, exception.getStatusCode().value());
+        }
+
+        @Test
+        void shouldReturnAuthenticatedUserClaims() {
+                AuthController.AuthenticatedUserResponse response = authController
+                                .getAuthenticatedUser(jwt("1", "john@example.com", "John Doe"))
+                                .getBody();
+
+                assertEquals("john@example.com", response.email());
+                assertEquals("John Doe", response.name());
+        }
+
+        private Jwt jwt(String subject, String email, String name) {
+                return Jwt.withTokenValue("jwt-token")
+                                .header("alg", "HS256")
+                                .subject(subject)
+                                .claim("email", email)
+                                .claim("name", name)
+                                .build();
         }
 }
