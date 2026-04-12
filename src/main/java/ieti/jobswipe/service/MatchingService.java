@@ -41,7 +41,7 @@ public class MatchingService {
         this.restTemplate = restTemplate;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = RuntimeException.class)
     public MatchingResponse calculateMatch(Long userId, Long vacancyId) {
         logger.info("🔍 MatchingService.calculateMatch called with userId={}, vacancyId={}", userId, vacancyId);
 

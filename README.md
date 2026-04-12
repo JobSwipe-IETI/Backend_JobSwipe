@@ -67,6 +67,30 @@ cd feature/initial-structure
 mvn spring-boot:run
 ```
 
+### Cache de recomendaciones (produccion)
+
+Para evitar recalcular el matching IA en cada carga de recomendaciones, el backend usa cache persistente por usuario+vacante con TTL.
+El score se recalcula solo si:
+
+- la vacante es nueva
+- cambió el perfil del candidato
+- cambió la vacante
+- expiró el TTL de cache
+
+1. Crear tabla en PostgreSQL con el script:
+
+```bash
+scripts/create_recommendation_cache.sql
+```
+
+2. Configurar TTL (opcional):
+
+```bash
+RECOMMENDATIONS_CACHE_TTL_SECONDS=1800
+```
+
+Valor por defecto: `1800` segundos (30 minutos).
+
 
 El servidor iniciará en:
 
