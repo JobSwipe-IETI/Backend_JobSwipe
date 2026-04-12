@@ -10,7 +10,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.User;
 import ieti.jobswipe.repository.UserRepository;
-import ieti.jobswipe.service.UserService;
 
 import java.util.List;
 import java.util.Arrays;

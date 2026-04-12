@@ -1,8 +1,5 @@
 package ieti.jobswipe.model;
 
-import ieti.jobswipe.model.User;
-import ieti.jobswipe.model.Profile;
-import ieti.jobswipe.model.Role;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

@@ -189,44 +189,17 @@ public class VacancyService {
         }
 
         for (Vacancy vacancy : vacancies) {
-            try {
-                if (swipedVacancyIds.contains(vacancy.getId())) {
-                    continue;
-                }
-                LocalDateTime vacancyUpdatedAt = vacancy.getUpdatedAt() != null
-                        ? vacancy.getUpdatedAt()
-                        : vacancy.getCreatedAt();
-                MatchingResponse match = resolveMatchWithCache(
-                        userId,
-                        vacancy.getId(),
-                        profileUpdatedAt,
-                        vacancyUpdatedAt,
-                        cacheThreshold);
-                Float compatibilityPercentage = match.getCompatibilityPercentage();
-                float score = compatibilityPercentage != null ? compatibilityPercentage.floatValue() : 0f;
+            evaluateVacancyRecommendation(
+                    vacancy,
+                    userId,
+                    profileUpdatedAt,
+                    cacheThreshold,
+                    swipedVacancyIds,
+                    effectiveMinScore)
+                    .ifPresent(recommendations::add);
 
-                if (score >= effectiveMinScore) {
-                    recommendations.add(VacancyRecommendationResponse.builder()
-                            .vacancyId(vacancy.getId())
-                            .title(vacancy.getTitle())
-                            .location(vacancy.getLocation())
-                            .compatibilityPercentage(match.getCompatibilityPercentage())
-                            .compatibilityLevel(match.getCompatibilityLevel())
-                            .similarityScore(match.getSimilarityScore())
-                            .feedback(match.getFeedback())
-                            .build());
-                }
-            } catch (RuntimeException ex) {
-                logger.warn("Skipping vacancy {} due to matching error: {}", vacancy.getId(), ex.getMessage());
-            } finally {
-                processed++;
-                if (progressListener != null) {
-                    progressListener.onProgress(
-                            processed,
-                            total,
-                            String.format("Procesando vacantes (%d/%d)", processed, total));
-                }
-            }
+            processed++;
+            notifyProgress(progressListener, processed, total);
         }
 
         recommendations.sort(
@@ -240,6 +213,64 @@ public class VacancyService {
         }
 
         return recommendations;
+    }
+
+    private Optional<VacancyRecommendationResponse> evaluateVacancyRecommendation(
+            Vacancy vacancy,
+            Long userId,
+            LocalDateTime profileUpdatedAt,
+            Instant cacheThreshold,
+            Set<Long> swipedVacancyIds,
+            float effectiveMinScore) {
+        try {
+            if (swipedVacancyIds.contains(vacancy.getId())) {
+                return Optional.empty();
+            }
+
+            LocalDateTime vacancyUpdatedAt = vacancy.getUpdatedAt() != null
+                    ? vacancy.getUpdatedAt()
+                    : vacancy.getCreatedAt();
+
+            MatchingResponse match = resolveMatchWithCache(
+                    userId,
+                    vacancy.getId(),
+                    profileUpdatedAt,
+                    vacancyUpdatedAt,
+                    cacheThreshold);
+
+            Float compatibilityPercentage = match.getCompatibilityPercentage();
+            float score = compatibilityPercentage != null ? compatibilityPercentage.floatValue() : 0f;
+            if (score < effectiveMinScore) {
+                return Optional.empty();
+            }
+
+            return Optional.of(VacancyRecommendationResponse.builder()
+                    .vacancyId(vacancy.getId())
+                    .title(vacancy.getTitle())
+                    .location(vacancy.getLocation())
+                    .compatibilityPercentage(match.getCompatibilityPercentage())
+                    .compatibilityLevel(match.getCompatibilityLevel())
+                    .similarityScore(match.getSimilarityScore())
+                    .feedback(match.getFeedback())
+                    .build());
+        } catch (RuntimeException ex) {
+            logger.warn("Skipping vacancy {} due to matching error: {}", vacancy.getId(), ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private void notifyProgress(
+            RecommendationProgressListener progressListener,
+            int processed,
+            int total) {
+        if (progressListener == null) {
+            return;
+        }
+
+        progressListener.onProgress(
+                processed,
+                total,
+                String.format("Procesando vacantes (%d/%d)", processed, total));
     }
 
     private MatchingResponse resolveMatchWithCache(

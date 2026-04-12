@@ -2,8 +2,6 @@ package ieti.jobswipe.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ieti.jobswipe.controller.AuthController;
-import ieti.jobswipe.controller.AuthController;
 import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.User;
 import ieti.jobswipe.security.AuthenticatedUser;
@@ -33,13 +31,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 @ExtendWith(MockitoExtension.class)
 class AuthControllerTest {
