@@ -8,6 +8,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import ieti.JobSwipe.dto.CreateVacancyRequest;
+import ieti.JobSwipe.dto.MatchingResponse;
+import ieti.JobSwipe.dto.VacancyRecommendationResponse;
 import ieti.JobSwipe.model.EmploymentType;
 import ieti.JobSwipe.model.ExperienceLevel;
 import ieti.JobSwipe.model.Modality;
@@ -24,8 +26,10 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,6 +42,9 @@ class VacancyServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private MatchingService matchingService;
 
     @InjectMocks
     private VacancyService vacancyService;
@@ -205,4 +212,85 @@ class VacancyServiceTest {
         verify(vacancyRepository, times(1)).findById(1L);
         verify(vacancyRepository, times(1)).delete(testVacancy);
     }
+
+        @Test
+        void shouldReturnRecommendedVacanciesSortedAndFilteredByScore() {
+        Vacancy second = Vacancy.builder()
+            .id(2L)
+            .title("Junior Developer")
+            .description("Looking for a junior developer")
+            .location("Medellín, Colombia")
+            .modality(Modality.HYBRID)
+            .employmentType(EmploymentType.PART_TIME)
+            .experienceLevel(ExperienceLevel.JUNIOR)
+            .minSalary(3000.0)
+            .maxSalary(5000.0)
+            .createdAt(LocalDateTime.now())
+            .company(testCompany)
+            .build();
+
+        when(vacancyRepository.findAll()).thenReturn(Arrays.asList(testVacancy, second));
+        when(matchingService.calculateMatch(1L, 1L)).thenReturn(MatchingResponse.builder()
+            .similarityScore(0.91)
+            .compatibilityPercentage(88.0f)
+            .compatibilityLevel("high")
+            .feedback("Great fit")
+            .usedLlmFeedback(true)
+            .build());
+        when(matchingService.calculateMatch(1L, 2L)).thenReturn(MatchingResponse.builder()
+            .similarityScore(0.72)
+            .compatibilityPercentage(72.0f)
+            .compatibilityLevel("medium")
+            .feedback("Good fit")
+            .usedLlmFeedback(false)
+            .build());
+
+        List<VacancyRecommendationResponse> recommendations = vacancyService.getRecommendedVacancies(1L, 70.0f, 10);
+
+        assertEquals(2, recommendations.size());
+        assertEquals(88.0f, recommendations.get(0).getCompatibilityPercentage());
+        assertEquals(72.0f, recommendations.get(1).getCompatibilityPercentage());
+        assertTrue(recommendations.stream().allMatch(item -> item.getCompatibilityPercentage() >= 70.0f));
+        verify(vacancyRepository, times(1)).findAll();
+        verify(matchingService, times(1)).calculateMatch(eq(1L), eq(1L));
+        verify(matchingService, times(1)).calculateMatch(eq(1L), eq(2L));
+        }
+
+        @Test
+        void shouldLimitRecommendedVacancies() {
+        Vacancy second = Vacancy.builder()
+            .id(2L)
+            .title("Junior Developer")
+            .description("Looking for a junior developer")
+            .location("Medellín, Colombia")
+            .modality(Modality.HYBRID)
+            .employmentType(EmploymentType.PART_TIME)
+            .experienceLevel(ExperienceLevel.JUNIOR)
+            .minSalary(3000.0)
+            .maxSalary(5000.0)
+            .createdAt(LocalDateTime.now())
+            .company(testCompany)
+            .build();
+
+        when(vacancyRepository.findAll()).thenReturn(Arrays.asList(testVacancy, second));
+        when(matchingService.calculateMatch(1L, 1L)).thenReturn(MatchingResponse.builder()
+            .similarityScore(0.91)
+            .compatibilityPercentage(88.0f)
+            .compatibilityLevel("high")
+            .feedback("Great fit")
+            .usedLlmFeedback(true)
+            .build());
+        when(matchingService.calculateMatch(1L, 2L)).thenReturn(MatchingResponse.builder()
+            .similarityScore(0.72)
+            .compatibilityPercentage(72.0f)
+            .compatibilityLevel("medium")
+            .feedback("Good fit")
+            .usedLlmFeedback(false)
+            .build());
+
+        List<VacancyRecommendationResponse> recommendations = vacancyService.getRecommendedVacancies(1L, 0.0f, 1);
+
+        assertEquals(1, recommendations.size());
+        assertEquals(88.0f, recommendations.get(0).getCompatibilityPercentage());
+        }
 }
