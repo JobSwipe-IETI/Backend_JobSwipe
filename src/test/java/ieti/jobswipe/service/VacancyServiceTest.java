@@ -1,11 +1,14 @@
 package ieti.jobswipe.service;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -28,15 +32,17 @@ import ieti.jobswipe.dto.VacancyRecommendationResponse;
 import ieti.jobswipe.model.EmploymentType;
 import ieti.jobswipe.model.ExperienceLevel;
 import ieti.jobswipe.model.Modality;
+import ieti.jobswipe.model.RecommendationCache;
 import ieti.jobswipe.model.Role;
+import ieti.jobswipe.model.SwipeDecisionType;
 import ieti.jobswipe.model.User;
 import ieti.jobswipe.model.Vacancy;
+import ieti.jobswipe.model.VacancySwipe;
+import ieti.jobswipe.repository.ProfileRepository;
+import ieti.jobswipe.repository.RecommendationCacheRepository;
 import ieti.jobswipe.repository.UserRepository;
 import ieti.jobswipe.repository.VacancyRepository;
-import ieti.jobswipe.service.MatchingService;
-import ieti.jobswipe.service.VacancyService;
-import ieti.jobswipe.service.MatchingService;
-import ieti.jobswipe.service.VacancyService;
+import ieti.jobswipe.repository.VacancySwipeRepository;
 
 @ExtendWith(MockitoExtension.class)
 class VacancyServiceTest {
@@ -49,6 +55,15 @@ class VacancyServiceTest {
 
     @Mock
     private MatchingService matchingService;
+
+    @Mock
+    private ProfileRepository profileRepository;
+
+    @Mock
+    private RecommendationCacheRepository recommendationCacheRepository;
+
+    @Mock
+    private VacancySwipeRepository vacancySwipeRepository;
 
     @InjectMocks
     private VacancyService vacancyService;
@@ -182,6 +197,42 @@ class VacancyServiceTest {
     }
 
     @Test
+    void shouldReturnAllVacanciesForUserWhenNoSwipesExist() {
+        when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of());
+        when(vacancyRepository.findAll()).thenReturn(Arrays.asList(testVacancy));
+
+        List<Vacancy> result = vacancyService.getAllVacanciesForUser(1L);
+
+        assertEquals(1, result.size());
+        assertEquals(testVacancy.getId(), result.get(0).getId());
+        verify(vacancyRepository, times(1)).findAll();
+    }
+
+    @Test
+    void shouldFilterOutSwipedVacanciesForUser() {
+        Vacancy second = Vacancy.builder()
+                .id(2L)
+                .title("Junior Developer")
+                .description("Looking for a junior developer")
+                .location("Medellin, Colombia")
+                .modality(Modality.HYBRID)
+                .employmentType(EmploymentType.PART_TIME)
+                .experienceLevel(ExperienceLevel.JUNIOR)
+                .createdAt(LocalDateTime.now())
+                .company(testCompany)
+                .build();
+
+        when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of(1L));
+        when(vacancyRepository.findAll()).thenReturn(Arrays.asList(testVacancy, second));
+
+        List<Vacancy> result = vacancyService.getAllVacanciesForUser(1L);
+
+        assertEquals(1, result.size());
+        assertEquals(2L, result.get(0).getId());
+        verify(vacancyRepository, times(1)).findAll();
+    }
+
+    @Test
     void shouldUpdateVacancy() {
         CreateVacancyRequest updateRequest = new CreateVacancyRequest();
         updateRequest.setTitle("Lead Developer");
@@ -241,6 +292,45 @@ class VacancyServiceTest {
         verify(vacancyRepository, never()).delete(any(Vacancy.class));
     }
 
+    @Test
+    void shouldRegisterSwipeDecisionWhenSwipeDoesNotExist() {
+        when(vacancyRepository.findById(1L)).thenReturn(Optional.of(testVacancy));
+        when(vacancySwipeRepository.findByUserIdAndVacancyId(1L, 1L)).thenReturn(Optional.empty());
+
+        vacancyService.registerSwipeDecision(1L, 1L, SwipeDecisionType.LIKE);
+
+        verify(vacancySwipeRepository, times(1)).save(any(VacancySwipe.class));
+    }
+
+    @Test
+    void shouldUpdateSwipeDecisionWhenSwipeAlreadyExists() {
+        VacancySwipe existing = VacancySwipe.builder()
+                .id(99L)
+                .userId(1L)
+                .vacancyId(1L)
+                .decision(SwipeDecisionType.DISLIKE)
+                .build();
+
+        when(vacancyRepository.findById(1L)).thenReturn(Optional.of(testVacancy));
+        when(vacancySwipeRepository.findByUserIdAndVacancyId(1L, 1L)).thenReturn(Optional.of(existing));
+
+        vacancyService.registerSwipeDecision(1L, 1L, SwipeDecisionType.LIKE);
+
+        assertEquals(SwipeDecisionType.LIKE, existing.getDecision());
+        verify(vacancySwipeRepository, times(1)).save(existing);
+    }
+
+    @Test
+    void shouldThrowWhenRegisteringSwipeForMissingVacancy() {
+        when(vacancyRepository.findById(404L)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> vacancyService.registerSwipeDecision(1L, 404L, SwipeDecisionType.LIKE));
+
+        assertEquals("Vacancy not found", exception.getMessage());
+        verify(vacancySwipeRepository, never()).save(any(VacancySwipe.class));
+    }
+
         @Test
         void shouldReturnRecommendedVacanciesSortedAndFilteredByScore() {
         Vacancy second = Vacancy.builder()
@@ -258,6 +348,10 @@ class VacancyServiceTest {
             .build();
 
         when(vacancyRepository.findAll()).thenReturn(Arrays.asList(testVacancy, second));
+        when(profileRepository.findUpdatedAtByUserId(1L)).thenReturn(Optional.of(LocalDateTime.now()));
+        when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of());
+        when(recommendationCacheRepository.findByUserIdAndVacancyId(any(Long.class), any(Long.class)))
+            .thenReturn(Optional.empty());
         when(matchingService.calculateMatch(1L, 1L)).thenReturn(MatchingResponse.builder()
             .similarityScore(0.91)
             .compatibilityPercentage(88.0f)
@@ -301,6 +395,10 @@ class VacancyServiceTest {
             .build();
 
         when(vacancyRepository.findAll()).thenReturn(Arrays.asList(testVacancy, second));
+        when(profileRepository.findUpdatedAtByUserId(1L)).thenReturn(Optional.of(LocalDateTime.now()));
+        when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of());
+        when(recommendationCacheRepository.findByUserIdAndVacancyId(any(Long.class), any(Long.class)))
+            .thenReturn(Optional.empty());
         when(matchingService.calculateMatch(1L, 1L)).thenReturn(MatchingResponse.builder()
             .similarityScore(0.91)
             .compatibilityPercentage(88.0f)
@@ -336,6 +434,10 @@ class VacancyServiceTest {
             .build();
 
         when(vacancyRepository.findAll()).thenReturn(Arrays.asList(testVacancy, second));
+        when(profileRepository.findUpdatedAtByUserId(1L)).thenReturn(Optional.of(LocalDateTime.now()));
+        when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of());
+        when(recommendationCacheRepository.findByUserIdAndVacancyId(any(Long.class), any(Long.class)))
+            .thenReturn(Optional.empty());
         when(matchingService.calculateMatch(1L, 1L)).thenReturn(MatchingResponse.builder()
             .compatibilityPercentage(50.0f)
             .compatibilityLevel("low")
@@ -369,6 +471,10 @@ class VacancyServiceTest {
             .build();
 
         when(vacancyRepository.findAll()).thenReturn(Arrays.asList(testVacancy, second));
+        when(profileRepository.findUpdatedAtByUserId(1L)).thenReturn(Optional.of(LocalDateTime.now()));
+        when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of());
+        when(recommendationCacheRepository.findByUserIdAndVacancyId(any(Long.class), any(Long.class)))
+            .thenReturn(Optional.empty());
         when(matchingService.calculateMatch(1L, 1L)).thenReturn(MatchingResponse.builder()
             .similarityScore(0.91)
             .compatibilityPercentage(null)
@@ -390,6 +496,227 @@ class VacancyServiceTest {
         }
 
         @Test
+        void shouldThrowWhenProfileIsMissingForRecommendations() {
+        when(vacancyRepository.findAll()).thenReturn(List.of(testVacancy));
+        when(profileRepository.findUpdatedAtByUserId(1L)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+            () -> vacancyService.getRecommendedVacancies(1L, 0.0f, 10));
+
+        assertEquals("Profile not found", exception.getMessage());
+        }
+
+        @Test
+        void shouldUseCachedRecommendationWhenCacheIsValid() {
+        LocalDateTime profileUpdatedAt = LocalDateTime.now().minusMinutes(1);
+        testVacancy.setCreatedAt(LocalDateTime.now().minusMinutes(2));
+
+        RecommendationCache cache = RecommendationCache.builder()
+            .userId(1L)
+            .vacancyId(1L)
+            .similarityScore(0.95)
+            .compatibilityPercentage(95.0f)
+            .compatibilityLevel("high")
+            .feedback("From cache")
+            .usedLlmFeedback(true)
+            .sourceProfileUpdatedAt(profileUpdatedAt)
+            .sourceVacancyUpdatedAt(testVacancy.getCreatedAt())
+            .updatedAt(Instant.now())
+            .build();
+
+        when(vacancyRepository.findAll()).thenReturn(List.of(testVacancy));
+        when(profileRepository.findUpdatedAtByUserId(1L)).thenReturn(Optional.of(profileUpdatedAt));
+        when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of());
+        when(recommendationCacheRepository.findByUserIdAndVacancyId(1L, 1L)).thenReturn(Optional.of(cache));
+
+        List<VacancyRecommendationResponse> recommendations = vacancyService.getRecommendedVacancies(1L, 0.0f, 10);
+
+        assertEquals(1, recommendations.size());
+        assertEquals(95.0f, recommendations.get(0).getCompatibilityPercentage());
+        verify(matchingService, never()).calculateMatch(any(Long.class), any(Long.class));
+        verify(recommendationCacheRepository, never()).save(any(RecommendationCache.class));
+        }
+
+        @Test
+        void shouldRecalculateWhenCacheUpdatedAtIsNull() {
+        LocalDateTime profileUpdatedAt = LocalDateTime.now().minusMinutes(1);
+        testVacancy.setCreatedAt(LocalDateTime.now().minusMinutes(2));
+
+        RecommendationCache cache = RecommendationCache.builder()
+            .userId(1L)
+            .vacancyId(1L)
+            .sourceProfileUpdatedAt(profileUpdatedAt)
+            .sourceVacancyUpdatedAt(testVacancy.getCreatedAt())
+            .updatedAt(null)
+            .build();
+
+        MatchingResponse fresh = MatchingResponse.builder()
+            .similarityScore(0.88)
+            .compatibilityPercentage(81.0f)
+            .compatibilityLevel("high")
+            .feedback("Recalculated")
+            .usedLlmFeedback(false)
+            .build();
+
+        when(vacancyRepository.findAll()).thenReturn(List.of(testVacancy));
+        when(profileRepository.findUpdatedAtByUserId(1L)).thenReturn(Optional.of(profileUpdatedAt));
+        when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of());
+        when(recommendationCacheRepository.findByUserIdAndVacancyId(1L, 1L)).thenReturn(Optional.of(cache));
+        when(matchingService.calculateMatch(1L, 1L)).thenReturn(fresh);
+
+        List<VacancyRecommendationResponse> recommendations = vacancyService.getRecommendedVacancies(1L, 0.0f, 10);
+
+        assertEquals(1, recommendations.size());
+        assertEquals(81.0f, recommendations.get(0).getCompatibilityPercentage());
+        verify(matchingService, times(1)).calculateMatch(1L, 1L);
+        verify(recommendationCacheRepository, times(1)).save(any(RecommendationCache.class));
+        }
+
+        @Test
+        void shouldRecalculateWhenCacheSourceTimestampsDoNotMatch() {
+        LocalDateTime profileUpdatedAt = LocalDateTime.now();
+        LocalDateTime staleProfileUpdatedAt = profileUpdatedAt.minusDays(1);
+        testVacancy.setCreatedAt(LocalDateTime.now().minusMinutes(2));
+
+        RecommendationCache cache = RecommendationCache.builder()
+            .userId(1L)
+            .vacancyId(1L)
+            .sourceProfileUpdatedAt(staleProfileUpdatedAt)
+            .sourceVacancyUpdatedAt(testVacancy.getCreatedAt())
+            .updatedAt(Instant.now())
+            .build();
+
+        MatchingResponse fresh = MatchingResponse.builder()
+            .similarityScore(0.67)
+            .compatibilityPercentage(70.0f)
+            .compatibilityLevel("medium")
+            .feedback("Updated profile")
+            .usedLlmFeedback(true)
+            .build();
+
+        when(vacancyRepository.findAll()).thenReturn(List.of(testVacancy));
+        when(profileRepository.findUpdatedAtByUserId(1L)).thenReturn(Optional.of(profileUpdatedAt));
+        when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of());
+        when(recommendationCacheRepository.findByUserIdAndVacancyId(1L, 1L)).thenReturn(Optional.of(cache));
+        when(matchingService.calculateMatch(1L, 1L)).thenReturn(fresh);
+
+        List<VacancyRecommendationResponse> recommendations = vacancyService.getRecommendedVacancies(1L, 0.0f, 10);
+
+        assertFalse(recommendations.isEmpty());
+        assertEquals(70.0f, recommendations.get(0).getCompatibilityPercentage());
+        verify(matchingService, times(1)).calculateMatch(1L, 1L);
+        }
+
+        @Test
+        void shouldRecalculateWhenCacheSourceVacancyTimestampDoesNotMatch() {
+        LocalDateTime profileUpdatedAt = LocalDateTime.now();
+        LocalDateTime vacancyUpdatedAt = LocalDateTime.now().minusMinutes(1);
+        testVacancy.setUpdatedAt(vacancyUpdatedAt);
+
+        RecommendationCache cache = RecommendationCache.builder()
+            .userId(1L)
+            .vacancyId(1L)
+            .sourceProfileUpdatedAt(profileUpdatedAt)
+            .sourceVacancyUpdatedAt(vacancyUpdatedAt.minusHours(2))
+            .updatedAt(Instant.now())
+            .build();
+
+        when(vacancyRepository.findAll()).thenReturn(List.of(testVacancy));
+        when(profileRepository.findUpdatedAtByUserId(1L)).thenReturn(Optional.of(profileUpdatedAt));
+        when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of());
+        when(recommendationCacheRepository.findByUserIdAndVacancyId(1L, 1L)).thenReturn(Optional.of(cache));
+        when(matchingService.calculateMatch(1L, 1L)).thenReturn(MatchingResponse.builder()
+            .similarityScore(0.82)
+            .compatibilityPercentage(82.0f)
+            .compatibilityLevel("high")
+            .feedback("Vacancy changed")
+            .build());
+
+        List<VacancyRecommendationResponse> recommendations = vacancyService.getRecommendedVacancies(1L, 0.0f, 10);
+
+        assertEquals(1, recommendations.size());
+        verify(matchingService, times(1)).calculateMatch(1L, 1L);
+        }
+
+        @Test
+        void shouldRecalculateWhenCacheIsOlderThanThreshold() {
+        LocalDateTime profileUpdatedAt = LocalDateTime.now();
+        testVacancy.setCreatedAt(LocalDateTime.now().minusMinutes(5));
+
+        RecommendationCache cache = RecommendationCache.builder()
+            .userId(1L)
+            .vacancyId(1L)
+            .sourceProfileUpdatedAt(profileUpdatedAt)
+            .sourceVacancyUpdatedAt(testVacancy.getCreatedAt())
+            .updatedAt(Instant.now().minusSeconds(7200))
+            .build();
+
+        when(vacancyRepository.findAll()).thenReturn(List.of(testVacancy));
+        when(profileRepository.findUpdatedAtByUserId(1L)).thenReturn(Optional.of(profileUpdatedAt));
+        when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of());
+        when(recommendationCacheRepository.findByUserIdAndVacancyId(1L, 1L)).thenReturn(Optional.of(cache));
+        when(matchingService.calculateMatch(1L, 1L)).thenReturn(MatchingResponse.builder()
+            .similarityScore(0.77)
+            .compatibilityPercentage(77.0f)
+            .compatibilityLevel("medium")
+            .feedback("Cache expired")
+            .build());
+
+        List<VacancyRecommendationResponse> recommendations = vacancyService.getRecommendedVacancies(1L, 0.0f, 10);
+
+        assertEquals(1, recommendations.size());
+        verify(matchingService, times(1)).calculateMatch(1L, 1L);
+        }
+
+        @Test
+        void shouldReportProgressAndUseUpdatedAtWhenPresent() {
+        LocalDateTime profileUpdatedAt = LocalDateTime.now();
+        LocalDateTime vacancyUpdatedAt = LocalDateTime.now().minusMinutes(1);
+        testVacancy.setUpdatedAt(vacancyUpdatedAt);
+        testVacancy.setCreatedAt(vacancyUpdatedAt.minusDays(1));
+
+        List<String> progressMessages = new ArrayList<>();
+
+        when(vacancyRepository.findAll()).thenReturn(List.of(testVacancy));
+        when(profileRepository.findUpdatedAtByUserId(1L)).thenReturn(Optional.of(profileUpdatedAt));
+        when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of());
+        when(recommendationCacheRepository.findByUserIdAndVacancyId(1L, 1L)).thenReturn(Optional.empty());
+        when(matchingService.calculateMatch(1L, 1L)).thenReturn(MatchingResponse.builder()
+            .similarityScore(0.9)
+            .compatibilityPercentage(90.0f)
+            .compatibilityLevel("high")
+            .feedback("Great fit")
+            .build());
+
+        List<VacancyRecommendationResponse> recommendations = vacancyService.getRecommendedVacanciesWithProgress(
+            1L,
+            0.0f,
+            10,
+            (processed, total, message) -> progressMessages.add(processed + "/" + total + ":" + message));
+
+        assertEquals(1, recommendations.size());
+        assertEquals(2, progressMessages.size());
+        assertTrue(progressMessages.get(0).startsWith("0/1:"));
+        assertTrue(progressMessages.get(1).startsWith("1/1:"));
+        }
+
+        @Test
+        void shouldSkipSwipedVacanciesWhenBuildingRecommendations() {
+        when(vacancyRepository.findAll()).thenReturn(List.of(testVacancy));
+        when(profileRepository.findUpdatedAtByUserId(1L)).thenReturn(Optional.of(LocalDateTime.now()));
+        when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of(1L));
+
+        List<VacancyRecommendationResponse> recommendations = vacancyService.getRecommendedVacanciesWithProgress(
+            1L,
+            0.0f,
+            10,
+            null);
+
+        assertTrue(recommendations.isEmpty());
+        verify(matchingService, never()).calculateMatch(anyLong(), anyLong());
+        }
+
+        @Test
         void shouldSkipVacancyWhenMatchingThrowsRuntimeException() {
         Vacancy second = Vacancy.builder()
             .id(2L)
@@ -403,6 +730,10 @@ class VacancyServiceTest {
             .build();
 
         when(vacancyRepository.findAll()).thenReturn(Arrays.asList(testVacancy, second));
+        when(profileRepository.findUpdatedAtByUserId(1L)).thenReturn(Optional.of(LocalDateTime.now()));
+        when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of());
+        when(recommendationCacheRepository.findByUserIdAndVacancyId(any(Long.class), any(Long.class)))
+            .thenReturn(Optional.empty());
         when(matchingService.calculateMatch(1L, 1L)).thenThrow(new RuntimeException("AI failed"));
         when(matchingService.calculateMatch(1L, 2L)).thenReturn(MatchingResponse.builder()
             .similarityScore(0.72)

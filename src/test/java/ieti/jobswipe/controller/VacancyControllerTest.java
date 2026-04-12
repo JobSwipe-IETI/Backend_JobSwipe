@@ -1,15 +1,15 @@
 package ieti.jobswipe.controller;
 
-import ieti.jobswipe.controller.VacancyController;
-import ieti.jobswipe.controller.VacancyController;
 import ieti.jobswipe.dto.CreateVacancyRequest;
 import ieti.jobswipe.dto.VacancyRecommendationResponse;
 import ieti.jobswipe.model.EmploymentType;
 import ieti.jobswipe.model.ExperienceLevel;
 import ieti.jobswipe.model.Modality;
 import ieti.jobswipe.model.Role;
+import ieti.jobswipe.model.SwipeDecisionType;
 import ieti.jobswipe.model.User;
 import ieti.jobswipe.model.Vacancy;
+import ieti.jobswipe.service.RecommendationJobService;
 import ieti.jobswipe.service.VacancyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,16 +17,22 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.jwt.Jwt;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyFloat;
@@ -43,6 +49,9 @@ class VacancyControllerTest {
 
     @Mock
     private VacancyService vacancyService;
+
+    @Mock
+    private RecommendationJobService recommendationJobService;
 
     @InjectMocks
     private VacancyController vacancyController;
@@ -101,16 +110,16 @@ class VacancyControllerTest {
     @Test
     void shouldGetAllVacancies() {
         List<Vacancy> vacancies = Arrays.asList(testVacancy, testVacancy2);
-        when(vacancyService.getAllVacancies()).thenReturn(vacancies);
+        when(vacancyService.getAllVacanciesForUser(1L)).thenReturn(vacancies);
 
-        ResponseEntity<List<Vacancy>> response = vacancyController.getAllVacancies();
+        ResponseEntity<List<Vacancy>> response = vacancyController.getAllVacancies(jwt("1", "CANDIDATE"));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(2, response.getBody().size());
         assertEquals("Backend Developer", response.getBody().get(0).getTitle());
         assertEquals("Frontend Developer", response.getBody().get(1).getTitle());
-        verify(vacancyService, times(1)).getAllVacancies();
+        verify(vacancyService, times(1)).getAllVacanciesForUser(1L);
     }
 
     @Test
@@ -176,6 +185,207 @@ class VacancyControllerTest {
         assertNull(response.getBody());
         verify(vacancyService, times(0)).getRecommendedVacancies(anyLong(), anyFloat(), anyInt());
     }
+
+        @Test
+        void shouldRegisterSwipeDecision() {
+        ResponseEntity<Void> response = vacancyController.registerSwipeDecision(
+            jwt("1", "CANDIDATE"), 99L, SwipeDecisionType.LIKE);
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verify(vacancyService, times(1)).registerSwipeDecision(1L, 99L, SwipeDecisionType.LIKE);
+        }
+
+        @Test
+        void shouldStartRecommendationJob() {
+        when(recommendationJobService.startJob(1L, 20.0f, 5)).thenReturn("job-123");
+
+        ResponseEntity<Map<String, String>> response = vacancyController.startRecommendedVacanciesJob(
+            jwt("1", "CANDIDATE"), 20.0f, 5);
+
+        assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("job-123", response.getBody().get("jobId"));
+        verify(recommendationJobService, times(1)).startJob(1L, 20.0f, 5);
+        }
+
+        @Test
+        void shouldReturn400WhenStartRecommendationJobParamsAreInvalid() {
+        ResponseEntity<Map<String, String>> response = vacancyController.startRecommendedVacanciesJob(
+            jwt("1", "CANDIDATE"), 150.0f, 5);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        verify(recommendationJobService, times(0)).startJob(anyLong(), anyFloat(), anyInt());
+        }
+
+            @Test
+            void shouldReturn400WhenStartRecommendationJobLimitIsNotPositive() {
+            ResponseEntity<Map<String, String>> response = vacancyController.startRecommendedVacanciesJob(
+                jwt("1", "CANDIDATE"), 10.0f, 0);
+
+            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+            verify(recommendationJobService, times(0)).startJob(anyLong(), anyFloat(), anyInt());
+            }
+
+            @Test
+            void shouldReturn400WhenStartRecommendationJobMinScoreIsNegative() {
+            ResponseEntity<Map<String, String>> response = vacancyController.startRecommendedVacanciesJob(
+                jwt("1", "CANDIDATE"), -0.1f, 10);
+
+            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+            verify(recommendationJobService, times(0)).startJob(anyLong(), anyFloat(), anyInt());
+            }
+
+            @Test
+            void shouldThrowWhenStartRecommendationJobMinScoreIsNull() {
+            assertThrows(NullPointerException.class,
+                () -> vacancyController.startRecommendedVacanciesJob(jwt("1", "CANDIDATE"), null, 10));
+            }
+
+            @Test
+            void shouldThrowWhenStartRecommendationJobLimitIsNull() {
+            assertThrows(NullPointerException.class,
+                () -> vacancyController.startRecommendedVacanciesJob(jwt("1", "CANDIDATE"), 10.0f, null));
+            }
+
+        @Test
+        void shouldReturnNotFoundWhenJobStatusIsMissing() {
+        when(recommendationJobService.getJob("missing", 1L)).thenReturn(Optional.empty());
+
+        ResponseEntity<Map<String, Object>> response = vacancyController.getRecommendedVacanciesJobStatus(
+            jwt("1", "CANDIDATE"), "missing");
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        }
+
+        @Test
+        void shouldReturnRecommendationJobStatus() {
+        RecommendationJobService.RecommendationJob job =
+            new RecommendationJobService.RecommendationJob("job-1", 1L);
+        when(recommendationJobService.getJob("job-1", 1L)).thenReturn(Optional.of(job));
+
+        ResponseEntity<Map<String, Object>> response = vacancyController.getRecommendedVacanciesJobStatus(
+            jwt("1", "CANDIDATE"), "job-1");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("job-1", response.getBody().get("jobId"));
+        assertEquals("RUNNING", response.getBody().get("status"));
+        }
+
+        @Test
+        void shouldReturnEmptyMessageAndErrorWhenJobStatusFieldsAreNull() {
+        RecommendationJobService.RecommendationJob job =
+            org.mockito.Mockito.mock(RecommendationJobService.RecommendationJob.class);
+        when(job.getJobId()).thenReturn("job-null-fields");
+        when(job.getStatus()).thenReturn(RecommendationJobService.JobStatus.RUNNING);
+        when(job.getProcessed()).thenReturn(1);
+        when(job.getTotal()).thenReturn(5);
+        when(job.getProgressPercent()).thenReturn(20);
+        when(job.getMessage()).thenReturn(null);
+        when(job.getError()).thenReturn(null);
+        when(job.getStartedAt()).thenReturn(Instant.now());
+        when(recommendationJobService.getJob("job-null-fields", 1L)).thenReturn(Optional.of(job));
+
+        ResponseEntity<Map<String, Object>> response = vacancyController.getRecommendedVacanciesJobStatus(
+            jwt("1", "CANDIDATE"), "job-null-fields");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("", response.getBody().get("message"));
+        assertEquals("", response.getBody().get("error"));
+        }
+
+        @Test
+        void shouldReturnJobStatusWithNonNullError() {
+        RecommendationJobService.RecommendationJob job =
+            org.mockito.Mockito.mock(RecommendationJobService.RecommendationJob.class);
+        when(job.getJobId()).thenReturn("job-status-failed");
+        when(job.getStatus()).thenReturn(RecommendationJobService.JobStatus.FAILED);
+        when(job.getProcessed()).thenReturn(5);
+        when(job.getTotal()).thenReturn(5);
+        when(job.getProgressPercent()).thenReturn(100);
+        when(job.getMessage()).thenReturn("No se pudieron generar recomendaciones");
+        when(job.getError()).thenReturn("AI timeout");
+        when(job.getStartedAt()).thenReturn(Instant.now());
+        when(recommendationJobService.getJob("job-status-failed", 1L)).thenReturn(Optional.of(job));
+
+        ResponseEntity<Map<String, Object>> response = vacancyController.getRecommendedVacanciesJobStatus(
+            jwt("1", "CANDIDATE"), "job-status-failed");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("AI timeout", response.getBody().get("error"));
+        }
+
+        @Test
+        void shouldReturnAcceptedWhenJobResultIsStillRunning() {
+        RecommendationJobService.RecommendationJob runningJob =
+            new RecommendationJobService.RecommendationJob("job-running", 1L);
+        when(recommendationJobService.getJob("job-running", 1L)).thenReturn(Optional.of(runningJob));
+
+        ResponseEntity<?> response = vacancyController.getRecommendedVacanciesJobResult(
+            jwt("1", "CANDIDATE"), "job-running");
+
+        assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
+        assertInstanceOf(Map.class, response.getBody());
+        }
+
+        @Test
+        void shouldReturnBadGatewayWhenJobResultFailed() {
+        RecommendationJobService.RecommendationJob failedJob =
+            org.mockito.Mockito.mock(RecommendationJobService.RecommendationJob.class);
+        when(failedJob.getStatus()).thenReturn(RecommendationJobService.JobStatus.FAILED);
+        when(failedJob.getError()).thenReturn("AI timeout");
+        when(recommendationJobService.getJob("job-failed", 1L)).thenReturn(Optional.of(failedJob));
+
+        ResponseEntity<?> response = vacancyController.getRecommendedVacanciesJobResult(
+            jwt("1", "CANDIDATE"), "job-failed");
+
+        assertEquals(HttpStatus.BAD_GATEWAY, response.getStatusCode());
+        assertInstanceOf(Map.class, response.getBody());
+        }
+
+        @Test
+        void shouldReturnDefaultFailedMessageWhenJobErrorIsNull() {
+        RecommendationJobService.RecommendationJob failedJob =
+            org.mockito.Mockito.mock(RecommendationJobService.RecommendationJob.class);
+        when(failedJob.getStatus()).thenReturn(RecommendationJobService.JobStatus.FAILED);
+        when(failedJob.getError()).thenReturn(null);
+        when(recommendationJobService.getJob("job-failed-null", 1L)).thenReturn(Optional.of(failedJob));
+
+        ResponseEntity<?> response = vacancyController.getRecommendedVacanciesJobResult(
+            jwt("1", "CANDIDATE"), "job-failed-null");
+
+        assertEquals(HttpStatus.BAD_GATEWAY, response.getStatusCode());
+        assertInstanceOf(Map.class, response.getBody());
+        assertEquals("Job failed", ((Map<?, ?>) response.getBody()).get("message"));
+        }
+
+        @Test
+        void shouldReturnResultWhenJobCompleted() {
+        RecommendationJobService.RecommendationJob completedJob =
+            org.mockito.Mockito.mock(RecommendationJobService.RecommendationJob.class);
+        List<VacancyRecommendationResponse> expected = List.of(
+            VacancyRecommendationResponse.builder().vacancyId(1L).title("Backend").build());
+
+        when(completedJob.getStatus()).thenReturn(RecommendationJobService.JobStatus.COMPLETED);
+        when(completedJob.getResult()).thenReturn(expected);
+        when(recommendationJobService.getJob("job-completed", 1L)).thenReturn(Optional.of(completedJob));
+
+        ResponseEntity<?> response = vacancyController.getRecommendedVacanciesJobResult(
+            jwt("1", "CANDIDATE"), "job-completed");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expected, response.getBody());
+        }
+
+        @Test
+        void shouldReturnNotFoundWhenJobResultIsMissing() {
+        when(recommendationJobService.getJob("missing", 1L)).thenReturn(Optional.empty());
+
+        ResponseEntity<?> response = vacancyController.getRecommendedVacanciesJobResult(
+            jwt("1", "CANDIDATE"), "missing");
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        }
 
     @Test
     void shouldGetVacancyById() {
