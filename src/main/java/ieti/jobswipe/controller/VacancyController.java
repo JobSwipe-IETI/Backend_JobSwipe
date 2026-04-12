@@ -6,7 +6,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import ieti.jobswipe.dto.CreateVacancyRequest;
 import ieti.jobswipe.dto.VacancyRecommendationResponse;
+import ieti.jobswipe.model.SwipeDecisionType;
 import ieti.jobswipe.model.Vacancy;
+import ieti.jobswipe.service.RecommendationJobService;
 import ieti.jobswipe.service.VacancyService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/vacancies")
@@ -30,16 +34,19 @@ import java.util.List;
 public class VacancyController {
 
     private final VacancyService vacancyService;
+    private final RecommendationJobService recommendationJobService;
 
-    public VacancyController(VacancyService vacancyService) {
+    public VacancyController(VacancyService vacancyService, RecommendationJobService recommendationJobService) {
         this.vacancyService = vacancyService;
+        this.recommendationJobService = recommendationJobService;
     }
 
     @GetMapping
     @Operation(summary = "Get all vacancies")
     @ApiResponse(responseCode = "200", description = "Vacancies retrieved successfully")
-    public ResponseEntity<List<Vacancy>> getAllVacancies() {
-        return ResponseEntity.ok(vacancyService.getAllVacancies());
+    public ResponseEntity<List<Vacancy>> getAllVacancies(@AuthenticationPrincipal Jwt jwt) {
+        Long userId = Long.parseLong(jwt.getSubject());
+        return ResponseEntity.ok(vacancyService.getAllVacanciesForUser(userId));
     }
 
     @GetMapping("/recommended")
@@ -59,6 +66,78 @@ public class VacancyController {
 
         Long userId = Long.parseLong(jwt.getSubject());
         return ResponseEntity.ok(vacancyService.getRecommendedVacancies(userId, minScore, limit));
+    }
+
+    @PostMapping("/{id}/swipe")
+    @Operation(summary = "Register swipe decision (LIKE/DISLIKE) for vacancy")
+    public ResponseEntity<Void> registerSwipeDecision(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long id,
+            @RequestParam SwipeDecisionType decision) {
+        Long userId = Long.parseLong(jwt.getSubject());
+        vacancyService.registerSwipeDecision(userId, id, decision);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/recommended/jobs")
+    @Operation(summary = "Start async recommendation job")
+    public ResponseEntity<Map<String, String>> startRecommendedVacanciesJob(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "0") Float minScore,
+            @RequestParam(defaultValue = "20") Integer limit) {
+        if (minScore < 0 || minScore > 100 || limit <= 0) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Long userId = Long.parseLong(jwt.getSubject());
+        String jobId = recommendationJobService.startJob(userId, minScore, limit);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("jobId", jobId));
+    }
+
+    @GetMapping("/recommended/jobs/{jobId}")
+    @Operation(summary = "Get async recommendation job status")
+    public ResponseEntity<Map<String, Object>> getRecommendedVacanciesJobStatus(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String jobId) {
+        Long userId = Long.parseLong(jwt.getSubject());
+        Optional<RecommendationJobService.RecommendationJob> jobOpt = recommendationJobService.getJob(jobId, userId);
+        if (jobOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        RecommendationJobService.RecommendationJob job = jobOpt.get();
+        return ResponseEntity.ok(Map.of(
+                "jobId", job.getJobId(),
+                "status", job.getStatus().name(),
+                "processed", job.getProcessed(),
+                "total", job.getTotal(),
+                "progressPercent", job.getProgressPercent(),
+                "message", job.getMessage() != null ? job.getMessage() : "",
+                "error", job.getError() != null ? job.getError() : "",
+                "startedAt", job.getStartedAt().toString()));
+    }
+
+    @GetMapping("/recommended/jobs/{jobId}/result")
+    @Operation(summary = "Get async recommendation job result")
+    public ResponseEntity<?> getRecommendedVacanciesJobResult(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String jobId) {
+        Long userId = Long.parseLong(jwt.getSubject());
+        Optional<RecommendationJobService.RecommendationJob> jobOpt = recommendationJobService.getJob(jobId, userId);
+        if (jobOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        RecommendationJobService.RecommendationJob job = jobOpt.get();
+        if (job.getStatus() == RecommendationJobService.JobStatus.RUNNING) {
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("message", "Job still running"));
+        }
+        if (job.getStatus() == RecommendationJobService.JobStatus.FAILED) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(Map.of("message", job.getError() != null ? job.getError() : "Job failed"));
+        }
+
+        return ResponseEntity.ok(job.getResult());
     }
 
     @GetMapping("/{id}")
