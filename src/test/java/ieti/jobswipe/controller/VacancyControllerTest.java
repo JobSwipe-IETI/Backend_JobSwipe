@@ -1,8 +1,12 @@
 package ieti.jobswipe.controller;
 
 import ieti.jobswipe.dto.CreateVacancyRequest;
+import ieti.jobswipe.dto.CandidateApplicationResponse;
+import ieti.jobswipe.dto.CompanyCandidateDecisionRequest;
+import ieti.jobswipe.dto.CompanyCandidateDecisionResponse;
 import ieti.jobswipe.dto.CompanyLikeActivityResponse;
 import ieti.jobswipe.dto.CompanyVacancyPipelineResponse;
+import ieti.jobswipe.dto.UserMatchResponse;
 import ieti.jobswipe.dto.VacancyApplicantResponse;
 import ieti.jobswipe.dto.VacancyRecommendationResponse;
 import ieti.jobswipe.model.EmploymentType;
@@ -755,6 +759,319 @@ class VacancyControllerTest {
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         verify(vacancyService, times(1)).deleteVacancy(999L);
     }
+
+        @Test
+        void shouldRegisterCompanyCandidateDecisionUsingBodyDecision() {
+        CompanyCandidateDecisionRequest request = CompanyCandidateDecisionRequest.builder()
+            .decision(SwipeDecisionType.DISLIKE)
+            .rejectionReason("Skills gap")
+            .rejectionTags(List.of("backend"))
+            .missingTechnologies(List.of("Spring"))
+            .missingResponsibilities(List.of("Mentoring"))
+            .missingTechnicalRequirements(List.of("System design"))
+            .expectedExperienceLevel("SENIOR")
+            .aiSummary("Candidate lacks required scope")
+            .rejectionComment("Not enough architecture depth")
+            .build();
+
+        CompanyCandidateDecisionResponse payload = CompanyCandidateDecisionResponse.builder()
+            .companyId(1L)
+            .candidateId(2L)
+            .vacancyId(3L)
+            .decision(SwipeDecisionType.DISLIKE)
+            .matched(false)
+            .build();
+
+        when(vacancyService.registerCompanyCandidateDecision(
+            1L,
+            3L,
+            2L,
+            SwipeDecisionType.DISLIKE,
+            "Skills gap",
+            List.of("backend"),
+            List.of("Spring"),
+            List.of("Mentoring"),
+            List.of("System design"),
+            "SENIOR",
+            "Candidate lacks required scope",
+            "Not enough architecture depth")).thenReturn(payload);
+
+        ResponseEntity<CompanyCandidateDecisionResponse> response = vacancyController.registerCompanyCandidateDecision(
+            jwt("1", "COMPANY"),
+            3L,
+            2L,
+            request,
+            null);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(SwipeDecisionType.DISLIKE, response.getBody().getDecision());
+        assertEquals(false, response.getBody().isMatched());
+        }
+
+        @Test
+        void shouldRegisterCompanyCandidateDecisionUsingQueryParamWhenBodyDecisionMissing() {
+        CompanyCandidateDecisionRequest request = CompanyCandidateDecisionRequest.builder()
+            .rejectionReason("unused")
+            .build();
+
+        CompanyCandidateDecisionResponse payload = CompanyCandidateDecisionResponse.builder()
+            .companyId(1L)
+            .candidateId(2L)
+            .vacancyId(3L)
+            .decision(SwipeDecisionType.LIKE)
+            .matched(true)
+            .build();
+
+        when(vacancyService.registerCompanyCandidateDecision(
+            1L,
+            3L,
+            2L,
+            SwipeDecisionType.LIKE,
+            "unused",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null)).thenReturn(payload);
+
+        ResponseEntity<CompanyCandidateDecisionResponse> response = vacancyController.registerCompanyCandidateDecision(
+            jwt("1", "COMPANY"),
+            3L,
+            2L,
+            request,
+            SwipeDecisionType.LIKE);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(true, response.getBody().isMatched());
+        }
+
+        @Test
+        void shouldRegisterCompanyCandidateDecisionWhenBodyIsNullAndDecisionComesFromQuery() {
+        CompanyCandidateDecisionResponse payload = CompanyCandidateDecisionResponse.builder()
+            .companyId(1L)
+            .candidateId(2L)
+            .vacancyId(3L)
+            .decision(SwipeDecisionType.LIKE)
+            .matched(false)
+            .build();
+
+        when(vacancyService.registerCompanyCandidateDecision(
+            1L,
+            3L,
+            2L,
+            SwipeDecisionType.LIKE,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null)).thenReturn(payload);
+
+        ResponseEntity<CompanyCandidateDecisionResponse> response = vacancyController.registerCompanyCandidateDecision(
+            jwt("1", "COMPANY"),
+            3L,
+            2L,
+            null,
+            SwipeDecisionType.LIKE);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(SwipeDecisionType.LIKE, response.getBody().getDecision());
+        }
+
+        @Test
+        void shouldReturn400WhenCompanyDecisionIsMissing() {
+        ResponseEntity<CompanyCandidateDecisionResponse> response = vacancyController.registerCompanyCandidateDecision(
+            jwt("1", "COMPANY"),
+            3L,
+            2L,
+            null,
+            null);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        verify(vacancyService, times(0)).registerCompanyCandidateDecision(
+            anyLong(), anyLong(), anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        void shouldReturn400WhenCompanyDecisionServiceThrowsIllegalArgument() {
+        CompanyCandidateDecisionRequest request = CompanyCandidateDecisionRequest.builder()
+            .decision(SwipeDecisionType.LIKE)
+            .build();
+        when(vacancyService.registerCompanyCandidateDecision(
+            1L,
+            3L,
+            2L,
+            SwipeDecisionType.LIKE,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null)).thenThrow(new IllegalArgumentException("invalid"));
+
+        ResponseEntity<CompanyCandidateDecisionResponse> response = vacancyController.registerCompanyCandidateDecision(
+            jwt("1", "COMPANY"),
+            3L,
+            2L,
+            request,
+            null);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        }
+
+        @Test
+        void shouldReturn404WhenCompanyDecisionServiceThrowsRuntime() {
+        CompanyCandidateDecisionRequest request = CompanyCandidateDecisionRequest.builder()
+            .decision(SwipeDecisionType.LIKE)
+            .build();
+        when(vacancyService.registerCompanyCandidateDecision(
+            1L,
+            3L,
+            2L,
+            SwipeDecisionType.LIKE,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null)).thenThrow(new RuntimeException("missing"));
+
+        ResponseEntity<CompanyCandidateDecisionResponse> response = vacancyController.registerCompanyCandidateDecision(
+            jwt("1", "COMPANY"),
+            3L,
+            2L,
+            request,
+            null);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        }
+
+        @Test
+        void shouldGetCandidateApplications() {
+        List<CandidateApplicationResponse> applications = List.of(
+            CandidateApplicationResponse.builder()
+                .vacancyId(10L)
+                .vacancyTitle("Backend")
+                .companyId(1L)
+                .companyName("Tech Co")
+                .decision(SwipeDecisionType.DISLIKE)
+                .matched(false)
+                .build());
+        when(vacancyService.getCandidateApplications(5L, 30)).thenReturn(applications);
+
+        ResponseEntity<List<CandidateApplicationResponse>> response = vacancyController.getApplications(
+            jwt("5", "CANDIDATE"),
+            30);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(1, response.getBody().size());
+        assertEquals(10L, response.getBody().get(0).getVacancyId());
+        }
+
+        @Test
+        void shouldReturn400WhenApplicationsLimitInvalid() {
+        ResponseEntity<List<CandidateApplicationResponse>> response = vacancyController.getApplications(
+            jwt("5", "CANDIDATE"),
+            0);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        verify(vacancyService, times(0)).getCandidateApplications(anyLong(), anyInt());
+        }
+
+    @Test
+    void shouldReturn400WhenApplicationsLimitExceedsMaximum() {
+        ResponseEntity<List<CandidateApplicationResponse>> response = vacancyController.getApplications(
+                jwt("5", "CANDIDATE"),
+                101);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        verify(vacancyService, times(0)).getCandidateApplications(anyLong(), anyInt());
+    }
+
+        @Test
+        void shouldReturn400WhenApplicationsServiceThrowsIllegalArgument() {
+        when(vacancyService.getCandidateApplications(5L, 30)).thenThrow(new IllegalArgumentException("invalid"));
+
+        ResponseEntity<List<CandidateApplicationResponse>> response = vacancyController.getApplications(
+            jwt("5", "CANDIDATE"),
+            30);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        }
+
+        @Test
+        void shouldReturn404WhenApplicationsServiceThrowsRuntime() {
+        when(vacancyService.getCandidateApplications(5L, 30)).thenThrow(new RuntimeException("missing"));
+
+        ResponseEntity<List<CandidateApplicationResponse>> response = vacancyController.getApplications(
+            jwt("5", "CANDIDATE"),
+            30);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        }
+
+        @Test
+        void shouldGetMatchesForUser() {
+        List<UserMatchResponse> matches = List.of(
+            UserMatchResponse.builder()
+                .vacancyId(10L)
+                .vacancyTitle("Backend")
+                .counterpartId(2L)
+                .counterpartName("Ana")
+                .build());
+        when(vacancyService.getMatchesForUser(1L, 20)).thenReturn(matches);
+
+        ResponseEntity<List<UserMatchResponse>> response = vacancyController.getMatches(
+            jwt("1", "CANDIDATE"),
+            20);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(1, response.getBody().size());
+        }
+
+        @Test
+        void shouldReturn400WhenMatchesLimitInvalid() {
+        ResponseEntity<List<UserMatchResponse>> response = vacancyController.getMatches(
+            jwt("1", "CANDIDATE"),
+            101);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        verify(vacancyService, times(0)).getMatchesForUser(anyLong(), anyInt());
+        }
+
+    @Test
+    void shouldReturn400WhenMatchesLimitIsNotPositive() {
+        ResponseEntity<List<UserMatchResponse>> response = vacancyController.getMatches(
+                jwt("1", "CANDIDATE"),
+                0);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        verify(vacancyService, times(0)).getMatchesForUser(anyLong(), anyInt());
+    }
+
+        @Test
+        void shouldReturn404WhenMatchesServiceThrowsRuntime() {
+        when(vacancyService.getMatchesForUser(1L, 20)).thenThrow(new RuntimeException("missing"));
+
+        ResponseEntity<List<UserMatchResponse>> response = vacancyController.getMatches(
+            jwt("1", "CANDIDATE"),
+            20);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        }
 
     private Jwt jwt(String subject, String role) {
         return Jwt.withTokenValue("test-token")
