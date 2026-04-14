@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,7 +36,7 @@ public class RecommendationJobService {
         private final AtomicInteger total;
         private final AtomicReference<String> message;
         private final AtomicReference<String> error;
-        private final AtomicReference<List<VacancyRecommendationResponse>> result;
+        private final List<VacancyRecommendationResponse> result;
 
         public RecommendationJob(String jobId, Long userId) {
             this.jobId = jobId;
@@ -46,7 +47,7 @@ public class RecommendationJobService {
             this.total = new AtomicInteger(0);
             this.message = new AtomicReference<>("Iniciando...");
             this.error = new AtomicReference<>(null);
-            this.result = new AtomicReference<>(List.of());
+            this.result = new CopyOnWriteArrayList<>();
         }
 
         public String getJobId() {
@@ -82,7 +83,7 @@ public class RecommendationJobService {
         }
 
         public List<VacancyRecommendationResponse> getResult() {
-            return result.get();
+            return List.copyOf(result);
         }
 
         public int getProgressPercent() {
@@ -95,6 +96,10 @@ public class RecommendationJobService {
             return Math.max(0, Math.min(100, value));
         }
 
+        private void addRecommendation(VacancyRecommendationResponse recommendation) {
+            this.result.add(recommendation);
+        }
+
         private void setProgress(int processed, int total, String message) {
             this.processed.set(processed);
             this.total.set(total);
@@ -102,7 +107,8 @@ public class RecommendationJobService {
         }
 
         private void complete(List<VacancyRecommendationResponse> result) {
-            this.result.set(List.copyOf(result));
+            this.result.clear();
+            this.result.addAll(result);
             this.status.set(JobStatus.COMPLETED);
             this.message.set("Recomendaciones listas");
             int totalValue = this.total.get();
@@ -137,7 +143,17 @@ public class RecommendationJobService {
                         userId,
                         minScore,
                         limit,
-                        job::setProgress);
+                        new VacancyService.RecommendationProgressListener() {
+                            @Override
+                            public void onProgress(int processed, int total, String message) {
+                                job.setProgress(processed, total, message);
+                            }
+
+                            @Override
+                            public void onRecommendation(VacancyRecommendationResponse recommendation) {
+                                job.addRecommendation(recommendation);
+                            }
+                        });
                 job.complete(recommendations);
             } catch (Exception ex) {
                 job.fail(ex.getMessage());
