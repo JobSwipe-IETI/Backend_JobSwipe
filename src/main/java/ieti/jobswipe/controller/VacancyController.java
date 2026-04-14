@@ -20,8 +20,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import ieti.jobswipe.dto.CompanyLikeActivityResponse;
+import ieti.jobswipe.dto.CandidateApplicationResponse;
+import ieti.jobswipe.dto.CompanyCandidateDecisionRequest;
+import ieti.jobswipe.dto.CompanyCandidateDecisionResponse;
 import ieti.jobswipe.dto.CompanyVacancyPipelineResponse;
 import ieti.jobswipe.dto.CreateVacancyRequest;
+import ieti.jobswipe.dto.UserMatchResponse;
 import ieti.jobswipe.dto.VacancyApplicantResponse;
 import ieti.jobswipe.dto.VacancyRecommendationResponse;
 import ieti.jobswipe.model.SwipeDecisionType;
@@ -119,6 +123,95 @@ public class VacancyController {
         Long companyId = Long.parseLong(jwt.getSubject());
         try {
             return ResponseEntity.ok(vacancyService.getApplicantsByVacancy(companyId, vacancyId, limit));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
+
+    @PostMapping("/company/vacancies/{vacancyId}/candidates/{candidateId}/decision")
+    @Operation(summary = "Register company decision (LIKE/DISLIKE) for a candidate in a vacancy")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Decision stored successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid request"),
+        @ApiResponse(responseCode = "404", description = "Vacancy or user not found")
+    })
+    public ResponseEntity<CompanyCandidateDecisionResponse> registerCompanyCandidateDecision(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long vacancyId,
+            @PathVariable Long candidateId,
+            @RequestBody(required = false) CompanyCandidateDecisionRequest request,
+            @RequestParam(required = false) SwipeDecisionType decision) {
+        try {
+            Long companyId = Long.parseLong(jwt.getSubject());
+            SwipeDecisionType resolvedDecision = request != null && request.getDecision() != null
+                    ? request.getDecision()
+                    : decision;
+            if (resolvedDecision == null) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
+                    companyId,
+                    vacancyId,
+                    candidateId,
+                    resolvedDecision,
+                    request != null ? request.getRejectionReason() : null,
+                    request != null ? request.getRejectionTags() : null,
+                    request != null ? request.getMissingTechnologies() : null,
+                        request != null ? request.getMissingResponsibilities() : null,
+                        request != null ? request.getMissingTechnicalRequirements() : null,
+                        request != null ? request.getExpectedExperienceLevel() : null,
+                        request != null ? request.getAiSummary() : null,
+                    request != null ? request.getRejectionComment() : null);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().build();
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
+
+    @GetMapping("/applications")
+    @Operation(summary = "Get applications for authenticated candidate")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Applications retrieved successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid limit parameter"),
+        @ApiResponse(responseCode = "404", description = "User not found")
+    })
+    public ResponseEntity<List<CandidateApplicationResponse>> getApplications(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "30") Integer limit) {
+        if (limit <= 0 || limit > 100) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            Long candidateId = Long.parseLong(jwt.getSubject());
+            return ResponseEntity.ok(vacancyService.getCandidateApplications(candidateId, limit));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().build();
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
+
+    @GetMapping("/matches")
+    @Operation(summary = "Get matches for authenticated user")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Matches retrieved successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid limit parameter"),
+        @ApiResponse(responseCode = "404", description = "User not found")
+    })
+    public ResponseEntity<List<UserMatchResponse>> getMatches(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "20") Integer limit) {
+        if (limit <= 0 || limit > 100) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            Long userId = Long.parseLong(jwt.getSubject());
+            return ResponseEntity.ok(vacancyService.getMatchesForUser(userId, limit));
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
