@@ -24,7 +24,8 @@ import lombok.Setter;
                 @UniqueConstraint(name = "uk_recommendation_cache_user_vacancy", columnNames = { "user_id", "vacancy_id" })
         },
         indexes = {
-                @Index(name = "idx_recommendation_cache_updated_at", columnList = "updated_at")
+                @Index(name = "idx_recommendation_cache_updated_at", columnList = "updated_at"),
+                @Index(name = "idx_recommendation_cache_user_vacancy_updated", columnList = "user_id,vacancy_id,updated_at")
         })
 @Getter
 @Setter
