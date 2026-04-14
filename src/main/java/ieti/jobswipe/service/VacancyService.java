@@ -4,8 +4,10 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -13,10 +15,15 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import ieti.jobswipe.dto.CompanyLikeActivityResponse;
+import ieti.jobswipe.dto.CompanyVacancyPipelineResponse;
 import ieti.jobswipe.dto.CreateVacancyRequest;
 import ieti.jobswipe.dto.MatchingResponse;
+import ieti.jobswipe.dto.VacancyApplicantResponse;
 import ieti.jobswipe.dto.VacancyRecommendationResponse;
 import ieti.jobswipe.exception.ErrorMessages;
 import ieti.jobswipe.exception.VacancyNotFoundException;
@@ -38,9 +45,12 @@ import ieti.jobswipe.repository.VacancySwipeRepository;
 @Service
 public class VacancyService {
 
-    @FunctionalInterface
     public interface RecommendationProgressListener {
         void onProgress(int processed, int total, String message);
+
+        default void onRecommendation(VacancyRecommendationResponse recommendation) {
+            // Optional hook for partial result streaming.
+        }
     }
 
     private static final Logger logger = LoggerFactory.getLogger(VacancyService.class);
@@ -73,7 +83,15 @@ public class VacancyService {
         return vacancyRepository.findAll();
     }
 
+    @Transactional(readOnly = true)
     public List<Vacancy> getAllVacanciesForUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException(ErrorMessages.USER_NOT_FOUND));
+
+        if (user.getRole() == Role.COMPANY) {
+            return vacancyRepository.findAllByCompanyId(userId);
+        }
+
         Set<Long> swipedVacancyIds = new HashSet<>(vacancySwipeRepository.findSwipedVacancyIdsByUserId(userId));
         if (swipedVacancyIds.isEmpty()) {
             return vacancyRepository.findAll();
@@ -89,6 +107,118 @@ public class VacancyService {
         return filtered;
     }
 
+    @Transactional(readOnly = true)
+    public List<CompanyLikeActivityResponse> getCompanyLikeActivity(Long companyId, Integer limit) {
+        int effectiveLimit = Math.max(1, Math.min(limit != null ? limit : 20, 100));
+
+        List<Vacancy> companyVacancies = vacancyRepository.findAllByCompanyId(companyId);
+        if (companyVacancies.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, String> vacancyTitles = new HashMap<>();
+        List<Long> vacancyIds = new ArrayList<>(companyVacancies.size());
+        for (Vacancy vacancy : companyVacancies) {
+            vacancyIds.add(vacancy.getId());
+            vacancyTitles.put(vacancy.getId(), vacancy.getTitle());
+        }
+
+        List<VacancySwipe> likes = vacancySwipeRepository.findRecentByVacancyIdsAndDecision(
+                vacancyIds,
+                SwipeDecisionType.LIKE,
+                PageRequest.of(0, effectiveLimit));
+
+        List<CompanyLikeActivityResponse> activity = new ArrayList<>(likes.size());
+        for (VacancySwipe like : likes) {
+            Long candidateId = like.getUserId();
+            String candidateName = userRepository.findById(candidateId)
+                    .map(User::getName)
+                    .orElse("Usuario " + candidateId);
+
+            activity.add(CompanyLikeActivityResponse.builder()
+                    .vacancyId(like.getVacancyId())
+                    .vacancyTitle(vacancyTitles.getOrDefault(like.getVacancyId(), "Vacante"))
+                    .candidateId(candidateId)
+                    .candidateName(candidateName)
+                    .likedAt(like.getUpdatedAt())
+                    .build());
+        }
+
+        return activity;
+    }
+
+    @Transactional(readOnly = true)
+    public List<CompanyVacancyPipelineResponse> getCompanyVacancyPipeline(Long companyId) {
+        List<Vacancy> companyVacancies = vacancyRepository.findAllByCompanyId(companyId);
+        List<CompanyVacancyPipelineResponse> pipeline = new ArrayList<>(companyVacancies.size());
+
+        for (Vacancy vacancy : companyVacancies) {
+            int applicantsCount = (int) vacancySwipeRepository
+                .countByVacancyIdAndDecision(vacancy.getId(), SwipeDecisionType.LIKE);
+
+            pipeline.add(CompanyVacancyPipelineResponse.builder()
+                    .vacancyId(vacancy.getId())
+                    .vacancyTitle(vacancy.getTitle())
+                    .applicantsCount(applicantsCount)
+                    .build());
+        }
+
+        pipeline.sort((a, b) -> Integer.compare(b.getApplicantsCount(), a.getApplicantsCount()));
+        return pipeline;
+    }
+
+    @Transactional(readOnly = true)
+    public List<VacancyApplicantResponse> getApplicantsByVacancy(Long companyId, Long vacancyId, Integer limit) {
+        int effectiveLimit = Math.max(1, Math.min(limit != null ? limit : 50, 200));
+
+        Vacancy vacancy = vacancyRepository.findById(vacancyId)
+                .orElseThrow(() -> new VacancyNotFoundException(ErrorMessages.VACANCY_NOT_FOUND));
+
+        if (vacancy.getCompany() == null || !companyId.equals(vacancy.getCompany().getId())) {
+            throw new VacancyNotFoundException(ErrorMessages.VACANCY_NOT_FOUND);
+        }
+
+        List<VacancySwipe> likes = vacancySwipeRepository.findByVacancyIdAndDecisionOrderByUpdatedAtDesc(
+                vacancyId,
+                SwipeDecisionType.LIKE,
+                PageRequest.of(0, effectiveLimit));
+
+        List<Long> candidateIds = new ArrayList<>(likes.size());
+        for (VacancySwipe like : likes) {
+            candidateIds.add(like.getUserId());
+        }
+        if (candidateIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, RecommendationCache> cacheByUserId = new HashMap<>();
+        for (RecommendationCache cache : recommendationCacheRepository.findByVacancyIdAndUserIdIn(vacancyId, candidateIds)) {
+            cacheByUserId.put(cache.getUserId(), cache);
+        }
+
+        List<VacancyApplicantResponse> applicants = new ArrayList<>(likes.size());
+        for (VacancySwipe like : likes) {
+            Long candidateId = like.getUserId();
+            RecommendationCache cache = cacheByUserId.get(candidateId);
+
+            String candidateName = userRepository.findById(candidateId)
+                    .map(User::getName)
+                    .orElse("Usuario " + candidateId);
+
+            applicants.add(VacancyApplicantResponse.builder()
+                    .candidateId(candidateId)
+                    .candidateName(candidateName)
+                    .compatibilityPercentage(cache != null ? cache.getCompatibilityPercentage() : null)
+                    .compatibilityLevel(cache != null ? cache.getCompatibilityLevel() : null)
+                    .feedback(cache != null ? cache.getFeedback() : null)
+                    .appliedAt(like.getUpdatedAt())
+                    .build());
+        }
+
+        return applicants;
+    }
+
+    @Transactional(readOnly = true)
     public Vacancy getVacancyById(Long id) {
         return vacancyRepository.findById(id)
                 .orElseThrow(() -> new VacancyNotFoundException(ErrorMessages.VACANCY_NOT_FOUND));
@@ -196,7 +326,12 @@ public class VacancyService {
                     cacheThreshold,
                     swipedVacancyIds,
                     effectiveMinScore)
-                    .ifPresent(recommendations::add);
+                    .ifPresent(recommendation -> {
+                        recommendations.add(recommendation);
+                        if (progressListener != null) {
+                            progressListener.onRecommendation(recommendation);
+                        }
+                    });
 
             processed++;
             notifyProgress(progressListener, processed, total);
