@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -198,6 +199,14 @@ class VacancyServiceTest {
 
     @Test
     void shouldReturnAllVacanciesForUserWhenNoSwipesExist() {
+        User candidate = User.builder()
+            .id(1L)
+            .name("Candidate User")
+            .email("candidate@example.com")
+            .role(Role.CANDIDATE)
+            .build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(candidate));
         when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of());
         when(vacancyRepository.findAll()).thenReturn(Arrays.asList(testVacancy));
 
@@ -210,6 +219,13 @@ class VacancyServiceTest {
 
     @Test
     void shouldFilterOutSwipedVacanciesForUser() {
+        User candidate = User.builder()
+            .id(1L)
+            .name("Candidate User")
+            .email("candidate@example.com")
+            .role(Role.CANDIDATE)
+            .build();
+
         Vacancy second = Vacancy.builder()
                 .id(2L)
                 .title("Junior Developer")
@@ -222,6 +238,7 @@ class VacancyServiceTest {
                 .company(testCompany)
                 .build();
 
+            when(userRepository.findById(1L)).thenReturn(Optional.of(candidate));
         when(vacancySwipeRepository.findSwipedVacancyIdsByUserId(1L)).thenReturn(List.of(1L));
         when(vacancyRepository.findAll()).thenReturn(Arrays.asList(testVacancy, second));
 
@@ -231,6 +248,271 @@ class VacancyServiceTest {
         assertEquals(2L, result.get(0).getId());
         verify(vacancyRepository, times(1)).findAll();
     }
+
+    @Test
+    void shouldThrowWhenUserNotFoundForGetAllVacanciesForUser() {
+        when(userRepository.findById(404L)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> vacancyService.getAllVacanciesForUser(404L));
+
+        assertEquals("User not found", exception.getMessage());
+        verify(vacancyRepository, never()).findAll();
+        verify(vacancyRepository, never()).findAllByCompanyId(anyLong());
+    }
+
+    @Test
+    void shouldReturnCompanyVacanciesForCompanyUser() {
+        User company = User.builder()
+                .id(1L)
+                .name("Company")
+                .email("company@example.com")
+                .role(Role.COMPANY)
+                .build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(company));
+        when(vacancyRepository.findAllByCompanyId(1L)).thenReturn(List.of(testVacancy));
+
+        List<Vacancy> result = vacancyService.getAllVacanciesForUser(1L);
+
+        assertEquals(1, result.size());
+        assertEquals(testVacancy.getId(), result.get(0).getId());
+        verify(vacancyRepository, times(1)).findAllByCompanyId(1L);
+        verify(vacancySwipeRepository, never()).findSwipedVacancyIdsByUserId(anyLong());
+    }
+
+        @Test
+        void shouldReturnEmptyCompanyLikeActivityWhenCompanyHasNoVacancies() {
+        when(vacancyRepository.findAllByCompanyId(1L)).thenReturn(List.of());
+
+        List<?> result = vacancyService.getCompanyLikeActivity(1L, 20);
+
+        assertTrue(result.isEmpty());
+        verify(vacancySwipeRepository, never()).findRecentByVacancyIdsAndDecision(any(), any(), any());
+        }
+
+        @Test
+        void shouldReturnCompanyLikeActivityWithCandidateNameFallback() {
+        Vacancy companyVacancy = Vacancy.builder()
+            .id(10L)
+            .title("Backend Developer")
+            .company(testCompany)
+            .build();
+
+        VacancySwipe likeKnownUser = VacancySwipe.builder()
+            .userId(100L)
+            .vacancyId(10L)
+            .decision(SwipeDecisionType.LIKE)
+            .updatedAt(LocalDateTime.now())
+            .build();
+
+        VacancySwipe likeUnknownUser = VacancySwipe.builder()
+            .userId(101L)
+            .vacancyId(10L)
+            .decision(SwipeDecisionType.LIKE)
+            .updatedAt(LocalDateTime.now())
+            .build();
+
+        when(vacancyRepository.findAllByCompanyId(1L)).thenReturn(List.of(companyVacancy));
+        when(vacancySwipeRepository.findRecentByVacancyIdsAndDecision(any(), eq(SwipeDecisionType.LIKE), any()))
+            .thenReturn(List.of(likeKnownUser, likeUnknownUser));
+        when(userRepository.findById(100L)).thenReturn(Optional.of(User.builder().id(100L).name("Ana").build()));
+        when(userRepository.findById(101L)).thenReturn(Optional.empty());
+
+        var activity = vacancyService.getCompanyLikeActivity(1L, 20);
+
+        assertEquals(2, activity.size());
+        assertEquals("Ana", activity.get(0).getCandidateName());
+        assertEquals("Usuario 101", activity.get(1).getCandidateName());
+        assertEquals("Backend Developer", activity.get(0).getVacancyTitle());
+        }
+
+        @Test
+        void shouldUseDefaultLimitWhenCompanyActivityLimitIsNull() {
+        Vacancy companyVacancy = Vacancy.builder()
+            .id(10L)
+            .title("Backend Developer")
+            .company(testCompany)
+            .build();
+
+        when(vacancyRepository.findAllByCompanyId(1L)).thenReturn(List.of(companyVacancy));
+        when(vacancySwipeRepository.findRecentByVacancyIdsAndDecision(
+                any(),
+                eq(SwipeDecisionType.LIKE),
+                argThat(page -> page.getPageNumber() == 0 && page.getPageSize() == 20)))
+            .thenReturn(List.of());
+
+        var activity = vacancyService.getCompanyLikeActivity(1L, null);
+
+        assertTrue(activity.isEmpty());
+        }
+
+        @Test
+        void shouldReturnCompanyVacancyPipelineSortedByApplicantsCountDesc() {
+        Vacancy first = Vacancy.builder().id(1L).title("First").company(testCompany).build();
+        Vacancy second = Vacancy.builder().id(2L).title("Second").company(testCompany).build();
+
+        when(vacancyRepository.findAllByCompanyId(1L)).thenReturn(List.of(first, second));
+        when(vacancySwipeRepository.countByVacancyIdAndDecision(1L, SwipeDecisionType.LIKE)).thenReturn(1L);
+        when(vacancySwipeRepository.countByVacancyIdAndDecision(2L, SwipeDecisionType.LIKE)).thenReturn(3L);
+
+        var pipeline = vacancyService.getCompanyVacancyPipeline(1L);
+
+        assertEquals(2, pipeline.size());
+        assertEquals(2L, pipeline.get(0).getVacancyId());
+        assertEquals(3, pipeline.get(0).getApplicantsCount());
+        assertEquals(1L, pipeline.get(1).getVacancyId());
+        }
+
+        @Test
+        void shouldReturnApplicantsByVacancyWithCompatibilityWhenCacheExists() {
+        User company = User.builder().id(1L).role(Role.COMPANY).build();
+        Vacancy companyVacancy = Vacancy.builder().id(77L).title("Vacancy").company(company).build();
+
+        VacancySwipe like = VacancySwipe.builder()
+            .userId(200L)
+            .vacancyId(77L)
+            .decision(SwipeDecisionType.LIKE)
+            .updatedAt(LocalDateTime.now())
+            .build();
+
+        RecommendationCache cache = RecommendationCache.builder()
+            .userId(200L)
+            .vacancyId(77L)
+            .compatibilityPercentage(92.0f)
+            .compatibilityLevel("high")
+            .feedback("Great fit")
+            .build();
+
+        when(vacancyRepository.findById(77L)).thenReturn(Optional.of(companyVacancy));
+        when(vacancySwipeRepository.findByVacancyIdAndDecisionOrderByUpdatedAtDesc(eq(77L), eq(SwipeDecisionType.LIKE), any()))
+            .thenReturn(List.of(like));
+        when(recommendationCacheRepository.findByVacancyIdAndUserIdIn(eq(77L), any()))
+            .thenReturn(List.of(cache));
+        when(userRepository.findById(200L)).thenReturn(Optional.of(User.builder().id(200L).name("Carlos").build()));
+
+        var applicants = vacancyService.getApplicantsByVacancy(1L, 77L, 10);
+
+        assertEquals(1, applicants.size());
+        assertEquals("Carlos", applicants.get(0).getCandidateName());
+        assertEquals(92.0f, applicants.get(0).getCompatibilityPercentage());
+        assertEquals("high", applicants.get(0).getCompatibilityLevel());
+        assertEquals("Great fit", applicants.get(0).getFeedback());
+        }
+
+        @Test
+        void shouldUseDefaultLimitWhenApplicantsLimitIsNull() {
+        User company = User.builder().id(1L).role(Role.COMPANY).build();
+        Vacancy companyVacancy = Vacancy.builder().id(81L).title("Vacancy").company(company).build();
+
+        when(vacancyRepository.findById(81L)).thenReturn(Optional.of(companyVacancy));
+        when(vacancySwipeRepository.findByVacancyIdAndDecisionOrderByUpdatedAtDesc(
+                eq(81L),
+                eq(SwipeDecisionType.LIKE),
+                argThat(page -> page.getPageNumber() == 0 && page.getPageSize() == 50)))
+            .thenReturn(List.of());
+
+        var applicants = vacancyService.getApplicantsByVacancy(1L, 81L, null);
+
+        assertTrue(applicants.isEmpty());
+        }
+
+        @Test
+        void shouldClampApplicantsLimitTo200WhenLimitExceedsMaximum() {
+        User company = User.builder().id(1L).role(Role.COMPANY).build();
+        Vacancy companyVacancy = Vacancy.builder().id(82L).title("Vacancy").company(company).build();
+
+        when(vacancyRepository.findById(82L)).thenReturn(Optional.of(companyVacancy));
+        when(vacancySwipeRepository.findByVacancyIdAndDecisionOrderByUpdatedAtDesc(
+                eq(82L),
+                eq(SwipeDecisionType.LIKE),
+                argThat(page -> page.getPageNumber() == 0 && page.getPageSize() == 200)))
+            .thenReturn(List.of());
+
+        var applicants = vacancyService.getApplicantsByVacancy(1L, 82L, 1000);
+
+        assertTrue(applicants.isEmpty());
+        }
+
+        @Test
+        void shouldReturnEmptyApplicantsWhenVacancyHasNoLikes() {
+        User company = User.builder().id(1L).role(Role.COMPANY).build();
+        Vacancy companyVacancy = Vacancy.builder().id(78L).title("Vacancy").company(company).build();
+
+        when(vacancyRepository.findById(78L)).thenReturn(Optional.of(companyVacancy));
+        when(vacancySwipeRepository.findByVacancyIdAndDecisionOrderByUpdatedAtDesc(eq(78L), eq(SwipeDecisionType.LIKE), any()))
+            .thenReturn(List.of());
+
+        var applicants = vacancyService.getApplicantsByVacancy(1L, 78L, 10);
+
+        assertTrue(applicants.isEmpty());
+        verify(recommendationCacheRepository, never()).findByVacancyIdAndUserIdIn(anyLong(), any());
+        }
+
+        @Test
+        void shouldReturnApplicantsWithNullCompatibilityWhenCacheIsMissing() {
+        User company = User.builder().id(1L).role(Role.COMPANY).build();
+        Vacancy companyVacancy = Vacancy.builder().id(83L).title("Vacancy").company(company).build();
+
+        VacancySwipe like = VacancySwipe.builder()
+            .userId(300L)
+            .vacancyId(83L)
+            .decision(SwipeDecisionType.LIKE)
+            .updatedAt(LocalDateTime.now())
+            .build();
+
+        when(vacancyRepository.findById(83L)).thenReturn(Optional.of(companyVacancy));
+        when(vacancySwipeRepository.findByVacancyIdAndDecisionOrderByUpdatedAtDesc(eq(83L), eq(SwipeDecisionType.LIKE), any()))
+            .thenReturn(List.of(like));
+        when(recommendationCacheRepository.findByVacancyIdAndUserIdIn(eq(83L), any()))
+            .thenReturn(List.of());
+        when(userRepository.findById(300L)).thenReturn(Optional.empty());
+
+        var applicants = vacancyService.getApplicantsByVacancy(1L, 83L, 10);
+
+        assertEquals(1, applicants.size());
+        assertEquals("Usuario 300", applicants.get(0).getCandidateName());
+        assertEquals(null, applicants.get(0).getCompatibilityPercentage());
+        assertEquals(null, applicants.get(0).getCompatibilityLevel());
+        assertEquals(null, applicants.get(0).getFeedback());
+        }
+
+        @Test
+        void shouldThrowWhenCompanyDoesNotOwnVacancyForApplicantsQuery() {
+        User otherCompany = User.builder().id(2L).role(Role.COMPANY).build();
+        Vacancy companyVacancy = Vacancy.builder().id(79L).title("Vacancy").company(otherCompany).build();
+        when(vacancyRepository.findById(79L)).thenReturn(Optional.of(companyVacancy));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+            () -> vacancyService.getApplicantsByVacancy(1L, 79L, 10));
+
+        assertEquals("Vacancy not found", exception.getMessage());
+        }
+
+        @Test
+        void shouldThrowWhenVacancyIsMissingForApplicantsQuery() {
+        when(vacancyRepository.findById(999L)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+            () -> vacancyService.getApplicantsByVacancy(1L, 999L, 10));
+
+        assertEquals("Vacancy not found", exception.getMessage());
+        verify(vacancySwipeRepository, never())
+            .findByVacancyIdAndDecisionOrderByUpdatedAtDesc(anyLong(), any(), any());
+        }
+
+        @Test
+        void shouldThrowWhenVacancyHasNoCompanyForApplicantsQuery() {
+        Vacancy orphanVacancy = Vacancy.builder().id(80L).title("Orphan").company(null).build();
+        when(vacancyRepository.findById(80L)).thenReturn(Optional.of(orphanVacancy));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+            () -> vacancyService.getApplicantsByVacancy(1L, 80L, 10));
+
+        assertEquals("Vacancy not found", exception.getMessage());
+        verify(vacancySwipeRepository, never())
+            .findByVacancyIdAndDecisionOrderByUpdatedAtDesc(anyLong(), any(), any());
+        }
 
     @Test
     void shouldUpdateVacancy() {
