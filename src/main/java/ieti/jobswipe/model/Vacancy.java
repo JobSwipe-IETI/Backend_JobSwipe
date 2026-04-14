@@ -16,8 +16,8 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
@@ -29,7 +29,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "vacancies")
+@Table(
+    name = "vacancies",
+    indexes = {
+        @Index(name = "idx_vacancies_company", columnList = "company_id")
+    })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -44,7 +48,6 @@ public class Vacancy {
     @Column(nullable = false)
     private String title;
 
-    @Lob
     @Column(nullable = false)
     private String description;
 
@@ -108,7 +111,7 @@ public class Vacancy {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id", nullable = false)
     @JsonIgnore
     private User company;
