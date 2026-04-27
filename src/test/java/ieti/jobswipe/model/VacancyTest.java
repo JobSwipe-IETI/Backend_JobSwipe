@@ -3,6 +3,8 @@ package ieti.jobswipe.model;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import ieti.jobswipe.model.entity.User;
+import ieti.jobswipe.model.entity.Vacancy;
 
 import java.util.List;
 

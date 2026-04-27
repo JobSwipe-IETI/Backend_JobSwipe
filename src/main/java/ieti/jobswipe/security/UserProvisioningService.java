@@ -11,8 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import ieti.jobswipe.model.Role;
-import ieti.jobswipe.model.User;
-import ieti.jobswipe.repository.UserRepository;
+import ieti.jobswipe.model.entity.User;
+import ieti.jobswipe.repository.user.UserRepository;
 
 @Service
 public class UserProvisioningService {

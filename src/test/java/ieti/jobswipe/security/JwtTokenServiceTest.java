@@ -2,7 +2,7 @@ package ieti.jobswipe.security;
 
 import ieti.jobswipe.config.JwtProperties;
 import ieti.jobswipe.model.Role;
-import ieti.jobswipe.model.User;
+import ieti.jobswipe.model.entity.User;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

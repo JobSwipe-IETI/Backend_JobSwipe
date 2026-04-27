@@ -13,12 +13,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.time.Instant;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -147,6 +151,88 @@ class GoogleIdentityTokenVerifierTest {
 
         assertEquals("Invalid Google identity token", exception.getMessage());
         assertNotNull(exception.getCause());
+    }
+
+    @Test
+    void shouldReturnCachedAuthenticatedUserOnSecondVerification() throws Exception {
+        String validToken = "cached.google.token";
+        GoogleIdToken mockToken = mock(GoogleIdToken.class);
+        GoogleIdToken.Payload mockPayload = mock(GoogleIdToken.Payload.class);
+
+        when(mockToken.getPayload()).thenReturn(mockPayload);
+        when(mockPayload.getSubject()).thenReturn("google-subject-cache");
+        when(mockPayload.getEmail()).thenReturn("cache@example.com");
+        when(mockPayload.get("name")).thenReturn("Cache User");
+        when(mockPayload.get("picture")).thenReturn(null);
+        when(mockGoogleVerifier.verify(validToken)).thenReturn(mockToken);
+
+        AuthenticatedUser first = identityTokenVerifier.verify(validToken);
+        AuthenticatedUser second = identityTokenVerifier.verify(validToken);
+
+        assertEquals(first, second);
+        verify(mockGoogleVerifier, times(1)).verify(validToken);
+    }
+
+    @Test
+    void shouldIgnoreExpiredCacheEntryAndReverifyToken() throws Exception {
+        String token = "expired.google.token";
+        java.lang.reflect.Field cacheField = GoogleIdentityTokenVerifier.class.getDeclaredField("tokenCache");
+        cacheField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> tokenCache = (Map<String, Object>) cacheField.get(identityTokenVerifier);
+
+        Class<?> snapshotClass = Class.forName("ieti.jobswipe.security.GoogleIdentityTokenVerifier$CachedAuthResult");
+        var constructor = snapshotClass.getDeclaredConstructors()[0];
+        constructor.setAccessible(true);
+        tokenCache.put(token, constructor.newInstance(
+                new AuthenticatedUser("old-subject", "old@example.com", null, null),
+                Instant.now().minusSeconds(1)));
+
+        GoogleIdToken mockToken = mock(GoogleIdToken.class);
+        GoogleIdToken.Payload mockPayload = mock(GoogleIdToken.Payload.class);
+        when(mockToken.getPayload()).thenReturn(mockPayload);
+        when(mockPayload.getSubject()).thenReturn("new-subject");
+        when(mockPayload.getEmail()).thenReturn("new@example.com");
+        when(mockPayload.get("name")).thenReturn("New User");
+        when(mockPayload.get("picture")).thenReturn(null);
+        when(mockGoogleVerifier.verify(token)).thenReturn(mockToken);
+
+        AuthenticatedUser result = identityTokenVerifier.verify(token);
+
+        assertEquals("new-subject", result.subject());
+        verify(mockGoogleVerifier, times(1)).verify(token);
+    }
+
+    @Test
+    void shouldPruneExpiredCacheEntriesWhenCacheGrowsLarge() throws Exception {
+        java.lang.reflect.Field cacheField = GoogleIdentityTokenVerifier.class.getDeclaredField("tokenCache");
+        cacheField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> tokenCache = (Map<String, Object>) cacheField.get(identityTokenVerifier);
+
+        Class<?> snapshotClass = Class.forName("ieti.jobswipe.security.GoogleIdentityTokenVerifier$CachedAuthResult");
+        var constructor = snapshotClass.getDeclaredConstructors()[0];
+        constructor.setAccessible(true);
+        for (int index = 0; index < 2048; index++) {
+            tokenCache.put("expired-" + index, constructor.newInstance(
+                    new AuthenticatedUser("subject-" + index, "user" + index + "@example.com", null, null),
+                    Instant.now().minusSeconds(10)));
+        }
+
+        String validToken = "fresh-token";
+        GoogleIdToken mockToken = mock(GoogleIdToken.class);
+        GoogleIdToken.Payload mockPayload = mock(GoogleIdToken.Payload.class);
+        when(mockToken.getPayload()).thenReturn(mockPayload);
+        when(mockPayload.getSubject()).thenReturn("subject-new");
+        when(mockPayload.getEmail()).thenReturn("new@example.com");
+        when(mockPayload.get("name")).thenReturn("New User");
+        when(mockPayload.get("picture")).thenReturn(null);
+        when(mockGoogleVerifier.verify(validToken)).thenReturn(mockToken);
+
+        AuthenticatedUser result = identityTokenVerifier.verify(validToken);
+
+        assertEquals("subject-new", result.subject());
+        verify(mockGoogleVerifier, times(1)).verify(validToken);
     }
 }
 

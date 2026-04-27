@@ -1,7 +1,7 @@
 package ieti.jobswipe.security;
 
 import ieti.jobswipe.config.JwtProperties;
-import ieti.jobswipe.model.User;
+import ieti.jobswipe.model.entity.User;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
