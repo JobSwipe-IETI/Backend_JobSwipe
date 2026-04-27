@@ -114,7 +114,7 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.name", is("John Doe")))
                 .andExpect(jsonPath("$.email", is("john@example.com")))
-                .andExpect(jsonPath("$.password", is("password123")))
+                        .andExpect(jsonPath("$.password").doesNotExist())
                 .andExpect(jsonPath("$.role", is("CANDIDATE")));
 
         verify(userService, times(1)).getUserById(1L);
@@ -158,7 +158,7 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.id", is(2)))
                 .andExpect(jsonPath("$.name", is("Jane Smith")))
                 .andExpect(jsonPath("$.email", is("jane@example.com")))
-                .andExpect(jsonPath("$.password", is("newpassword")))
+                        .andExpect(jsonPath("$.password").doesNotExist())
                 .andExpect(jsonPath("$.role", is("COMPANY")));
 
         verify(userService, times(1)).createUser(any(User.class));
@@ -190,7 +190,7 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.name", is("John Updated")))
                 .andExpect(jsonPath("$.email", is("john.updated@example.com")))
-                .andExpect(jsonPath("$.password", is("newpassword123")))
+                        .andExpect(jsonPath("$.password").doesNotExist())
                 .andExpect(jsonPath("$.role", is("COMPANY")));
 
         verify(userService, times(1)).updateUser(eq(1L), any(User.class));

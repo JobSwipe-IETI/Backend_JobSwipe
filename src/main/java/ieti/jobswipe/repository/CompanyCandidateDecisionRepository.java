@@ -13,17 +13,23 @@ import ieti.jobswipe.model.SwipeDecisionType;
 
 public interface CompanyCandidateDecisionRepository extends JpaRepository<CompanyCandidateDecision, Long> {
 
-    Optional<CompanyCandidateDecision> findByCompanyIdAndCandidateIdAndVacancyId(Long companyId, Long candidateId,
-            Long vacancyId);
+    Optional<CompanyCandidateDecision> findByCompanyIdAndCandidateIdAndVacancyId(Long companyId, Long candidateId, Long vacancyId);
 
-    List<CompanyCandidateDecision> findByCandidateIdAndDecisionOrderByUpdatedAtDesc(Long candidateId,
-            SwipeDecisionType decision, Pageable pageable);
 
-    List<CompanyCandidateDecision> findByCompanyIdAndDecisionOrderByUpdatedAtDesc(Long companyId,
-            SwipeDecisionType decision, Pageable pageable);
+    List<CompanyCandidateDecision> findByCandidateIdAndDecisionOrderByUpdatedAtDesc(Long candidateId, SwipeDecisionType decision, Pageable pageable);
+
+    List<CompanyCandidateDecision> findByCompanyIdAndDecisionOrderByUpdatedAtDesc(Long companyId, SwipeDecisionType decision, Pageable pageable);
 
     List<CompanyCandidateDecision> findByCompanyIdAndVacancyIdIn(Long companyId, List<Long> vacancyIds);
 
+    boolean existsByCompanyIdAndCandidateIdAndVacancyIdAndDecision(
+        Long companyId,
+        Long candidateId,
+        Long vacancyId,
+        SwipeDecisionType decision
+    );
+
+    void deleteByVacancyId(Long vacancyId);
     List<CompanyCandidateDecision> findByCompanyIdAndVacancyIdAndCandidateIdIn(
             Long companyId,
             Long vacancyId,

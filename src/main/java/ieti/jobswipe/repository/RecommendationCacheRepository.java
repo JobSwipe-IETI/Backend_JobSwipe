@@ -19,4 +19,5 @@ public interface RecommendationCacheRepository extends JpaRepository<Recommendat
     List<RecommendationCache> findByVacancyIdAndUserIdIn(Long vacancyId, List<Long> userIds);
 
     long deleteByUpdatedAtBefore(Instant threshold);
+    void deleteByVacancyId(Long vacancyId);
 }

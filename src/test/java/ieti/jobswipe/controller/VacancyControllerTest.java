@@ -6,9 +6,11 @@ import ieti.jobswipe.dto.CompanyCandidateDecisionRequest;
 import ieti.jobswipe.dto.CompanyCandidateDecisionResponse;
 import ieti.jobswipe.dto.CompanyLikeActivityResponse;
 import ieti.jobswipe.dto.CompanyVacancyPipelineResponse;
+import ieti.jobswipe.dto.VacancyDetailResponse;
 import ieti.jobswipe.dto.UserMatchResponse;
 import ieti.jobswipe.dto.VacancyApplicantResponse;
 import ieti.jobswipe.dto.VacancyRecommendationResponse;
+import ieti.jobswipe.dto.VacancySummaryResponse;
 import ieti.jobswipe.model.EmploymentType;
 import ieti.jobswipe.model.ExperienceLevel;
 import ieti.jobswipe.model.Modality;
@@ -77,30 +79,30 @@ class VacancyControllerTest {
                 .build();
 
         testVacancy = Vacancy.builder()
-                .id(1L)
-                .title("Backend Developer")
-                .description("Java + Spring Boot")
-                .location("Bogota, Colombia")
-                .modality(Modality.REMOTE)
-                .employmentType(EmploymentType.FULL_TIME)
-                .experienceLevel(ExperienceLevel.SENIOR)
-                .minSalary(5000.0)
-                .maxSalary(8000.0)
-                .company(testCompany)
-                .build();
+            .id(1L)
+            .title("Backend Developer")
+            .description("Java + Spring Boot")
+            .location("Bogota, Colombia")
+            .modality(Modality.REMOTE)
+            .employmentType(EmploymentType.FULL_TIME)
+            .experienceLevel(ExperienceLevel.SENIOR)
+            .minSalary(5000.0)
+            .maxSalary(8000.0)
+            .company(testCompany)
+            .build();
 
         testVacancy2 = Vacancy.builder()
-                .id(2L)
-                .title("Frontend Developer")
-                .description("React + TypeScript")
-                .location("Medellin, Colombia")
-                .modality(Modality.HYBRID)
-                .employmentType(EmploymentType.FULL_TIME)
-                .experienceLevel(ExperienceLevel.SEMI_SENIOR)
-                .minSalary(4000.0)
-                .maxSalary(6000.0)
-                .company(testCompany)
-                .build();
+            .id(2L)
+            .title("Frontend Developer")
+            .description("React + TypeScript")
+            .location("Medellin, Colombia")
+            .modality(Modality.HYBRID)
+            .employmentType(EmploymentType.FULL_TIME)
+            .experienceLevel(ExperienceLevel.SEMI_SENIOR)
+            .minSalary(4000.0)
+            .maxSalary(6000.0)
+            .company(testCompany)
+            .build();
 
         testRequest = new CreateVacancyRequest();
         testRequest.setTitle("Backend Developer");
@@ -115,17 +117,19 @@ class VacancyControllerTest {
 
     @Test
     void shouldGetAllVacancies() {
-        List<Vacancy> vacancies = Arrays.asList(testVacancy, testVacancy2);
-        when(vacancyService.getAllVacanciesForUser(1L)).thenReturn(vacancies);
+        List<VacancySummaryResponse> vacancies = Arrays.asList(
+                new VacancySummaryResponse(1L, "Backend Developer", "Tech Company Inc", "Bogota, Colombia", "Java + Spring Boot", 5000.0, 8000.0),
+                new VacancySummaryResponse(2L, "Frontend Developer", "Tech Company Inc", "Medellin, Colombia", "React + TypeScript", 4000.0, 6000.0));
+        when(vacancyService.getVacancySummariesForUser(1L)).thenReturn(vacancies);
 
-        ResponseEntity<List<Vacancy>> response = vacancyController.getAllVacancies(jwt("1", "CANDIDATE"));
+        ResponseEntity<List<VacancySummaryResponse>> response = vacancyController.getAllVacancies(jwt("1", "CANDIDATE"));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(2, response.getBody().size());
-        assertEquals("Backend Developer", response.getBody().get(0).getTitle());
-        assertEquals("Frontend Developer", response.getBody().get(1).getTitle());
-        verify(vacancyService, times(1)).getAllVacanciesForUser(1L);
+        assertEquals("Backend Developer", response.getBody().get(0).title());
+        assertEquals("Frontend Developer", response.getBody().get(1).title());
+        verify(vacancyService, times(1)).getVacancySummariesForUser(1L);
     }
 
     @Test
@@ -622,14 +626,31 @@ class VacancyControllerTest {
 
     @Test
     void shouldGetVacancyById() {
-        when(vacancyService.getVacancyById(1L)).thenReturn(testVacancy);
+        when(vacancyService.getVacancyById(1L)).thenReturn(new VacancyDetailResponse(
+                1L,
+                "Backend Developer",
+                "Java + Spring Boot",
+                "Bogota, Colombia",
+                null,
+                "REMOTE",
+                "FULL_TIME",
+                "SENIOR",
+                List.of("Java"),
+                List.of("Teamwork"),
+                List.of("Build APIs"),
+                List.of("Spring Boot"),
+                5000.0,
+                8000.0,
+                List.of("Remote"),
+                1L,
+                "Tech Company Inc"));
 
-        ResponseEntity<Vacancy> response = vacancyController.getVacancyById(1L);
+        ResponseEntity<VacancyDetailResponse> response = vacancyController.getVacancyById(1L);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(1L, response.getBody().getId());
-        assertEquals("Backend Developer", response.getBody().getTitle());
+        assertEquals(1L, response.getBody().id());
+        assertEquals("Backend Developer", response.getBody().title());
         verify(vacancyService, times(1)).getVacancyById(1L);
     }
 
@@ -637,7 +658,7 @@ class VacancyControllerTest {
     void shouldReturn404WhenVacancyNotFound() {
         when(vacancyService.getVacancyById(999L)).thenThrow(new RuntimeException("Vacancy not found"));
 
-        ResponseEntity<Vacancy> response = vacancyController.getVacancyById(999L);
+        ResponseEntity<VacancyDetailResponse> response = vacancyController.getVacancyById(999L);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertNull(response.getBody());
@@ -646,14 +667,31 @@ class VacancyControllerTest {
 
     @Test
     void shouldCreateVacancy() {
-        when(vacancyService.createVacancy(any(CreateVacancyRequest.class), eq(1L))).thenReturn(testVacancy);
+        when(vacancyService.createVacancy(any(CreateVacancyRequest.class), eq(1L))).thenReturn(new VacancyDetailResponse(
+                1L,
+                "Backend Developer",
+                "Java + Spring Boot",
+                "Bogota, Colombia",
+                null,
+                "REMOTE",
+                "FULL_TIME",
+                "SENIOR",
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                5000.0,
+                8000.0,
+                List.of(),
+                1L,
+                "Tech Company Inc"));
 
-        ResponseEntity<Vacancy> response = vacancyController.createVacancy(testRequest, jwt("1", "COMPANY"));
+        ResponseEntity<VacancyDetailResponse> response = vacancyController.createVacancy(testRequest, jwt("1", "COMPANY"));
 
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(1L, response.getBody().getId());
-        assertEquals("Backend Developer", response.getBody().getTitle());
+        assertEquals(1L, response.getBody().id());
+        assertEquals("Backend Developer", response.getBody().title());
         verify(vacancyService, times(1)).createVacancy(any(CreateVacancyRequest.class), eq(1L));
     }
 
@@ -662,7 +700,7 @@ class VacancyControllerTest {
         when(vacancyService.createVacancy(any(CreateVacancyRequest.class), eq(999L)))
                 .thenThrow(new RuntimeException("Company not found"));
 
-        ResponseEntity<Vacancy> response = vacancyController.createVacancy(testRequest, jwt("999", "COMPANY"));
+        ResponseEntity<VacancyDetailResponse> response = vacancyController.createVacancy(testRequest, jwt("999", "COMPANY"));
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertNull(response.getBody());
@@ -674,7 +712,7 @@ class VacancyControllerTest {
         when(vacancyService.createVacancy(any(CreateVacancyRequest.class), eq(1L)))
                 .thenThrow(new IllegalArgumentException("Only COMPANY users can create vacancies"));
 
-        ResponseEntity<Vacancy> response = vacancyController.createVacancy(testRequest, jwt("1", "CANDIDATE"));
+        ResponseEntity<VacancyDetailResponse> response = vacancyController.createVacancy(testRequest, jwt("1", "CANDIDATE"));
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNull(response.getBody());
@@ -693,26 +731,32 @@ class VacancyControllerTest {
         updateRequest.setMinSalary(6000.0);
         updateRequest.setMaxSalary(9000.0);
 
-        Vacancy updatedVacancy = Vacancy.builder()
-                .id(1L)
-                .title("Senior Backend Developer")
-                .description("Java + Spring Boot + Kubernetes")
-                .location("Bogota, Colombia")
-                .modality(Modality.REMOTE)
-                .employmentType(EmploymentType.FULL_TIME)
-                .experienceLevel(ExperienceLevel.SENIOR)
-                .minSalary(6000.0)
-                .maxSalary(9000.0)
-                .company(testCompany)
-                .build();
+        VacancyDetailResponse updatedVacancy = new VacancyDetailResponse(
+            1L,
+            "Senior Backend Developer",
+            "Java + Spring Boot + Kubernetes",
+            "Bogota, Colombia",
+            null,
+            "REMOTE",
+            "FULL_TIME",
+            "SENIOR",
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            6000.0,
+            9000.0,
+            List.of(),
+            1L,
+            "Tech Company Inc");
 
         when(vacancyService.updateVacancy(eq(1L), any(CreateVacancyRequest.class))).thenReturn(updatedVacancy);
 
-        ResponseEntity<Vacancy> response = vacancyController.updateVacancy(1L, updateRequest);
+        ResponseEntity<VacancyDetailResponse> response = vacancyController.updateVacancy(1L, updateRequest);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals("Senior Backend Developer", response.getBody().getTitle());
+        assertEquals("Senior Backend Developer", response.getBody().title());
         verify(vacancyService, times(1)).updateVacancy(eq(1L), any(CreateVacancyRequest.class));
     }
 
@@ -721,7 +765,7 @@ class VacancyControllerTest {
         when(vacancyService.updateVacancy(eq(1L), any(CreateVacancyRequest.class)))
                 .thenThrow(new IllegalArgumentException("Invalid salary range"));
 
-        ResponseEntity<Vacancy> response = vacancyController.updateVacancy(1L, testRequest);
+        ResponseEntity<VacancyDetailResponse> response = vacancyController.updateVacancy(1L, testRequest);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNull(response.getBody());
@@ -733,7 +777,7 @@ class VacancyControllerTest {
         when(vacancyService.updateVacancy(eq(999L), any(CreateVacancyRequest.class)))
                 .thenThrow(new RuntimeException("Vacancy not found"));
 
-        ResponseEntity<Vacancy> response = vacancyController.updateVacancy(999L, testRequest);
+        ResponseEntity<VacancyDetailResponse> response = vacancyController.updateVacancy(999L, testRequest);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertNull(response.getBody());

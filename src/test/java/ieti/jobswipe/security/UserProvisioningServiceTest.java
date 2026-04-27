@@ -53,8 +53,8 @@ class UserProvisioningServiceTest {
 
     @Test
     void shouldCreateNewUserWhenGoogleIdNotFound() {
-        when(userRepository.findByGoogleId("google-subject-123")).thenReturn(Optional.empty());
-        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findFirstByGoogleIdOrEmail("google-subject-123", "john@example.com"))
+            .thenReturn(Optional.empty());
         when(userRepository.save(any(User.class))).thenReturn(testUser);
 
         User result = provisioningService.ensureUserExists(testAuthenticatedUser);
@@ -66,9 +66,8 @@ class UserProvisioningServiceTest {
         assertEquals(Role.CANDIDATE, result.getRole());
         assertEquals("https://example.com/avatar.jpg", result.getAvatarUrl());
 
-        verify(userRepository, times(1)).findByGoogleId("google-subject-123");
-        verify(userRepository, times(1)).findByEmail("john@example.com");
-        verify(userRepository, times(2)).save(any(User.class));
+        verify(userRepository, times(1)).findFirstByGoogleIdOrEmail("google-subject-123", "john@example.com");
+        verify(userRepository, times(1)).save(any(User.class));
     }
 
     @Test
@@ -83,8 +82,8 @@ class UserProvisioningServiceTest {
                 .role(Role.CANDIDATE)
                 .build();
 
-        when(userRepository.findByGoogleId("google-subject-123")).thenReturn(Optional.of(existingUser));
-        when(userRepository.save(any(User.class))).thenReturn(existingUser);
+        when(userRepository.findFirstByGoogleIdOrEmail("google-subject-123", "john@example.com"))
+            .thenReturn(Optional.of(existingUser));
 
         User result = provisioningService.ensureUserExists(testAuthenticatedUser);
 
@@ -92,8 +91,8 @@ class UserProvisioningServiceTest {
         assertEquals(5L, result.getId());
         assertEquals("John Doe", result.getName());
 
-        verify(userRepository, times(1)).findByGoogleId("google-subject-123");
-        verify(userRepository, times(1)).save(any(User.class));
+        verify(userRepository, times(1)).findFirstByGoogleIdOrEmail("google-subject-123", "john@example.com");
+        verify(userRepository, times(0)).save(any(User.class));
     }
 
     @Test
@@ -110,8 +109,8 @@ class UserProvisioningServiceTest {
 
         existingUserByEmail.setGoogleId("google-subject-123");
 
-        when(userRepository.findByGoogleId("google-subject-123")).thenReturn(Optional.empty());
-        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(existingUserByEmail));
+        when(userRepository.findFirstByGoogleIdOrEmail("google-subject-123", "john@example.com"))
+            .thenReturn(Optional.of(existingUserByEmail));
         when(userRepository.save(any(User.class))).thenReturn(existingUserByEmail);
 
         User result = provisioningService.ensureUserExists(testAuthenticatedUser);
@@ -120,8 +119,7 @@ class UserProvisioningServiceTest {
         assertEquals(3L, result.getId());
         assertEquals("google-subject-123", result.getGoogleId());
 
-        verify(userRepository, times(1)).findByGoogleId("google-subject-123");
-        verify(userRepository, times(1)).findByEmail("john@example.com");
+        verify(userRepository, times(1)).findFirstByGoogleIdOrEmail("google-subject-123", "john@example.com");
         verify(userRepository, times(1)).save(any(User.class));
     }
 
@@ -137,7 +135,8 @@ class UserProvisioningServiceTest {
                 .role(Role.CANDIDATE)
                 .build();
 
-        when(userRepository.findByGoogleId("google-subject-123")).thenReturn(Optional.of(existingUser));
+        when(userRepository.findFirstByGoogleIdOrEmail("google-subject-123", "john@example.com"))
+            .thenReturn(Optional.of(existingUser));
         when(userRepository.save(any(User.class))).thenReturn(existingUser);
 
         User result = provisioningService.ensureUserExists(testAuthenticatedUser);
@@ -145,7 +144,7 @@ class UserProvisioningServiceTest {
         assertNotNull(result);
         assertEquals("John Doe", result.getName());
 
-        verify(userRepository, times(1)).findByGoogleId("google-subject-123");
+        verify(userRepository, times(1)).findFirstByGoogleIdOrEmail("google-subject-123", "john@example.com");
         verify(userRepository, times(1)).save(any(User.class));
     }
 
@@ -161,7 +160,8 @@ class UserProvisioningServiceTest {
                 .role(Role.CANDIDATE)
                 .build();
 
-        when(userRepository.findByGoogleId("google-subject-123")).thenReturn(Optional.of(existingUser));
+        when(userRepository.findFirstByGoogleIdOrEmail("google-subject-123", "john@example.com"))
+            .thenReturn(Optional.of(existingUser));
         when(userRepository.save(any(User.class))).thenReturn(existingUser);
 
         User result = provisioningService.ensureUserExists(testAuthenticatedUser);
@@ -169,14 +169,14 @@ class UserProvisioningServiceTest {
         assertNotNull(result);
         assertEquals("https://example.com/avatar.jpg", result.getAvatarUrl());
 
-        verify(userRepository, times(1)).findByGoogleId("google-subject-123");
+        verify(userRepository, times(1)).findFirstByGoogleIdOrEmail("google-subject-123", "john@example.com");
         verify(userRepository, times(1)).save(any(User.class));
     }
 
     @Test
     void shouldSetDefaultRoleForNewUser() {
-        when(userRepository.findByGoogleId("google-subject-123")).thenReturn(Optional.empty());
-        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findFirstByGoogleIdOrEmail("google-subject-123", "john@example.com"))
+            .thenReturn(Optional.empty());
         when(userRepository.save(any(User.class))).thenReturn(testUser);
 
         User result = provisioningService.ensureUserExists(testAuthenticatedUser);
@@ -184,9 +184,8 @@ class UserProvisioningServiceTest {
         assertNotNull(result);
         assertEquals(Role.CANDIDATE, result.getRole());
 
-        verify(userRepository, times(1)).findByGoogleId("google-subject-123");
-        verify(userRepository, times(1)).findByEmail("john@example.com");
-        verify(userRepository, times(2)).save(any(User.class));
+        verify(userRepository, times(1)).findFirstByGoogleIdOrEmail("google-subject-123", "john@example.com");
+        verify(userRepository, times(1)).save(any(User.class));
     }
 
     @Test
@@ -207,16 +206,16 @@ class UserProvisioningServiceTest {
                 .role(Role.CANDIDATE)
                 .build();
 
-        when(userRepository.findByGoogleId("google-subject-123")).thenReturn(Optional.of(existingUser));
-        when(userRepository.save(any(User.class))).thenReturn(existingUser);
+        when(userRepository.findFirstByGoogleIdOrEmail("google-subject-123", "john@example.com"))
+            .thenReturn(Optional.of(existingUser));
 
         User result = provisioningService.ensureUserExists(authenticatedUserWithoutOptionalFields);
 
         assertNotNull(result);
         assertEquals("Stored Name", result.getName());
         assertEquals("https://example.com/stored-avatar.jpg", result.getAvatarUrl());
-        verify(userRepository, times(1)).findByGoogleId("google-subject-123");
-        verify(userRepository, times(1)).save(any(User.class));
+        verify(userRepository, times(1)).findFirstByGoogleIdOrEmail("google-subject-123", "john@example.com");
+        verify(userRepository, times(0)).save(any(User.class));
     }
 
     @Test
@@ -237,17 +236,16 @@ class UserProvisioningServiceTest {
                 .role(Role.CANDIDATE)
                 .build();
 
-        when(userRepository.findByGoogleId("google-subject-999")).thenReturn(Optional.empty());
-        when(userRepository.findByEmail("noname@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findFirstByGoogleIdOrEmail("google-subject-999", "noname@example.com"))
+            .thenReturn(Optional.empty());
         when(userRepository.save(any(User.class))).thenReturn(createdUser);
 
         User result = provisioningService.ensureUserExists(userWithoutName);
 
         assertNotNull(result);
         assertEquals("noname@example.com", result.getName());
-        verify(userRepository, times(1)).findByGoogleId("google-subject-999");
-        verify(userRepository, times(1)).findByEmail("noname@example.com");
-        verify(userRepository, times(2)).save(any(User.class));
+        verify(userRepository, times(1)).findFirstByGoogleIdOrEmail("google-subject-999", "noname@example.com");
+        verify(userRepository, times(1)).save(any(User.class));
     }
 }
 

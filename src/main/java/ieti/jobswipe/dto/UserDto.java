@@ -1,0 +1,16 @@
+package ieti.jobswipe.dto;
+
+import java.time.LocalDateTime;
+
+import ieti.jobswipe.model.Role;
+
+public record UserDto(
+        Long id,
+        String name,
+        String email,
+        String googleId,
+        String avatarUrl,
+        Role role,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt) {
+}

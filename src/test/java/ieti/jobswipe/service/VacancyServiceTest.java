@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.cache.CacheManager;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -32,6 +33,7 @@ import ieti.jobswipe.dto.MatchingResponse;
 import ieti.jobswipe.dto.CandidateApplicationResponse;
 import ieti.jobswipe.dto.CompanyCandidateDecisionResponse;
 import ieti.jobswipe.dto.UserMatchResponse;
+import ieti.jobswipe.dto.VacancyDetailResponse;
 import ieti.jobswipe.dto.VacancyRecommendationResponse;
 import ieti.jobswipe.model.CompanyCandidateDecision;
 import ieti.jobswipe.model.EmploymentType;
@@ -75,6 +77,9 @@ class VacancyServiceTest {
 
     @Mock
     private CompanyCandidateDecisionRepository companyCandidateDecisionRepository;
+
+    @Mock
+    private CacheManager cacheManager;
 
     @InjectMocks
     private VacancyService vacancyService;
@@ -123,11 +128,11 @@ class VacancyServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testCompany));
         when(vacancyRepository.save(any(Vacancy.class))).thenReturn(testVacancy);
 
-        Vacancy created = vacancyService.createVacancy(testRequest, 1L);
+        VacancyDetailResponse created = vacancyService.createVacancy(testRequest, 1L);
 
         assertNotNull(created);
-        assertEquals("Senior Developer", created.getTitle());
-        assertEquals(1L, created.getCompany().getId());
+        assertEquals("Senior Developer", created.title());
+        assertEquals(1L, created.companyId());
         verify(userRepository, times(1)).findById(1L);
         verify(vacancyRepository, times(1)).save(any(Vacancy.class));
     }
@@ -164,11 +169,11 @@ class VacancyServiceTest {
     void shouldReturnVacancyById() {
         when(vacancyRepository.findById(1L)).thenReturn(Optional.of(testVacancy));
 
-        Vacancy found = vacancyService.getVacancyById(1L);
+        VacancyDetailResponse found = vacancyService.getVacancyById(1L);
 
         assertNotNull(found);
-        assertEquals("Senior Developer", found.getTitle());
-        assertEquals(1L, found.getId());
+        assertEquals("Senior Developer", found.title());
+        assertEquals(1L, found.id());
         verify(vacancyRepository, times(1)).findById(1L);
     }
 
@@ -326,8 +331,7 @@ class VacancyServiceTest {
         when(vacancyRepository.findAllByCompanyId(1L)).thenReturn(List.of(companyVacancy));
         when(vacancySwipeRepository.findRecentByVacancyIdsAndDecision(any(), eq(SwipeDecisionType.LIKE), any()))
             .thenReturn(List.of(likeKnownUser, likeUnknownUser));
-        when(userRepository.findById(100L)).thenReturn(Optional.of(User.builder().id(100L).name("Ana").build()));
-        when(userRepository.findById(101L)).thenReturn(Optional.empty());
+        when(userRepository.findAllById(any())).thenReturn(List.of(User.builder().id(100L).name("Ana").build()));
 
         var activity = vacancyService.getCompanyLikeActivity(1L, 20);
 
@@ -412,7 +416,7 @@ class VacancyServiceTest {
             .thenReturn(List.of(like));
         when(recommendationCacheRepository.findByVacancyIdAndUserIdIn(eq(77L), any()))
             .thenReturn(List.of(cache));
-        when(userRepository.findById(200L)).thenReturn(Optional.of(User.builder().id(200L).name("Carlos").build()));
+        when(userRepository.findAllById(any())).thenReturn(List.of(User.builder().id(200L).name("Carlos").build()));
 
         var applicants = vacancyService.getApplicantsByVacancy(1L, 77L, 10);
 
@@ -489,7 +493,7 @@ class VacancyServiceTest {
             .thenReturn(List.of(like));
         when(recommendationCacheRepository.findByVacancyIdAndUserIdIn(eq(83L), any()))
             .thenReturn(List.of());
-        when(userRepository.findById(300L)).thenReturn(Optional.empty());
+        when(userRepository.findAllById(any())).thenReturn(List.of());
 
         var applicants = vacancyService.getApplicantsByVacancy(1L, 83L, 10);
 
@@ -552,13 +556,13 @@ class VacancyServiceTest {
         when(vacancyRepository.findById(1L)).thenReturn(Optional.of(testVacancy));
         when(vacancyRepository.save(any(Vacancy.class))).thenAnswer(i -> i.getArgument(0));
 
-        Vacancy updated = vacancyService.updateVacancy(1L, updateRequest);
+        VacancyDetailResponse updated = vacancyService.updateVacancy(1L, updateRequest);
 
         assertNotNull(updated);
-        assertEquals("Lead Developer", updated.getTitle());
-        assertEquals("Lead role", updated.getDescription());
-        assertEquals(9000.0, updated.getMinSalary());
-        assertEquals(12000.0, updated.getMaxSalary());
+        assertEquals("Lead Developer", updated.title());
+        assertEquals("Lead role", updated.description());
+        assertEquals(9000.0, updated.minSalary());
+        assertEquals(12000.0, updated.maxSalary());
         verify(vacancyRepository, times(1)).findById(1L);
         verify(vacancyRepository, times(1)).save(any(Vacancy.class));
     }
@@ -1070,18 +1074,18 @@ class VacancyServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testCompany));
         when(vacancyRepository.save(any(Vacancy.class))).thenAnswer(i -> i.getArgument(0));
 
-        Vacancy created = vacancyService.createVacancy(requestWithNullLists, 1L);
+        VacancyDetailResponse created = vacancyService.createVacancy(requestWithNullLists, 1L);
 
-        assertNotNull(created.getTechnologies());
-        assertTrue(created.getTechnologies().isEmpty());
-        assertNotNull(created.getSoftSkills());
-        assertTrue(created.getSoftSkills().isEmpty());
-        assertNotNull(created.getResponsibilities());
-        assertTrue(created.getResponsibilities().isEmpty());
-        assertNotNull(created.getTechnicalRequirements());
-        assertTrue(created.getTechnicalRequirements().isEmpty());
-        assertNotNull(created.getBenefits());
-        assertTrue(created.getBenefits().isEmpty());
+        assertNotNull(created.technologies());
+        assertTrue(created.technologies().isEmpty());
+        assertNotNull(created.softSkills());
+        assertTrue(created.softSkills().isEmpty());
+        assertNotNull(created.responsibilities());
+        assertTrue(created.responsibilities().isEmpty());
+        assertNotNull(created.technicalRequirements());
+        assertTrue(created.technicalRequirements().isEmpty());
+        assertNotNull(created.benefits());
+        assertTrue(created.benefits().isEmpty());
         }
 
         @Test
@@ -1099,12 +1103,12 @@ class VacancyServiceTest {
         when(vacancyRepository.findById(1L)).thenReturn(Optional.of(testVacancy));
         when(vacancyRepository.save(any(Vacancy.class))).thenAnswer(i -> i.getArgument(0));
 
-        Vacancy updated = vacancyService.updateVacancy(1L, updateRequest);
+        VacancyDetailResponse updated = vacancyService.updateVacancy(1L, updateRequest);
 
-        assertNotNull(updated.getTechnologies());
-        assertTrue(updated.getTechnologies().isEmpty());
-        assertNotNull(updated.getBenefits());
-        assertTrue(updated.getBenefits().isEmpty());
+        assertNotNull(updated.technologies());
+        assertTrue(updated.technologies().isEmpty());
+        assertNotNull(updated.benefits());
+        assertTrue(updated.benefits().isEmpty());
         verify(vacancyRepository, never()).delete(any(Vacancy.class));
         }
 
@@ -1124,11 +1128,11 @@ class VacancyServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testCompany));
         when(vacancyRepository.save(any(Vacancy.class))).thenAnswer(i -> i.getArgument(0));
 
-        Vacancy created = vacancyService.createVacancy(requestWithLists, 1L);
+        VacancyDetailResponse created = vacancyService.createVacancy(requestWithLists, 1L);
 
-        assertNotNull(created.getTechnologies());
-        assertEquals(2, created.getTechnologies().size());
-        assertEquals("Java", created.getTechnologies().get(0));
+        assertNotNull(created.technologies());
+        assertEquals(2, created.technologies().size());
+        assertEquals("Java", created.technologies().get(0));
         }
 
         @Test
@@ -1560,9 +1564,9 @@ class VacancyServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testCompany));
         when(vacancyRepository.save(any(Vacancy.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Vacancy created = vacancyService.createVacancy(testRequest, 1L);
+        VacancyDetailResponse created = vacancyService.createVacancy(testRequest, 1L);
 
-        assertEquals(ExperienceLevel.MID, created.getExperienceLevel());
+        assertEquals("MID", created.experienceLevel());
         }
 
         @Test
@@ -1571,9 +1575,9 @@ class VacancyServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testCompany));
         when(vacancyRepository.save(any(Vacancy.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Vacancy created = vacancyService.createVacancy(testRequest, 1L);
+        VacancyDetailResponse created = vacancyService.createVacancy(testRequest, 1L);
 
-        assertEquals(ExperienceLevel.SEMI_SENIOR, created.getExperienceLevel());
+        assertEquals("SEMI_SENIOR", created.experienceLevel());
         }
 
         @Test
@@ -1609,7 +1613,8 @@ class VacancyServiceTest {
             profileRepository,
             recommendationCacheRepository,
             vacancySwipeRepository,
-            null);
+            null,
+            cacheManager);
 
         Vacancy first = Vacancy.builder().id(1L).title("First").company(testCompany).build();
         Vacancy second = Vacancy.builder().id(2L).title("Second").company(testCompany).build();
@@ -1676,7 +1681,8 @@ class VacancyServiceTest {
             profileRepository,
             recommendationCacheRepository,
             vacancySwipeRepository,
-            null);
+            null,
+            cacheManager);
 
         User company = User.builder().id(1L).role(Role.COMPANY).build();
         Vacancy vacancy = Vacancy.builder().id(88L).title("Backend").company(company).build();

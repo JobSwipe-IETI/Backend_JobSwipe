@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,7 +33,11 @@ public class CacheConfig {
     @Value("${app.cache.ttl.matches-seconds:30}")
     private long matchesTtlSeconds;
 
+    @Value("${app.cache.ttl.applications-seconds:30}")
+    private long applicationsTtlSeconds;
+
     @Bean
+    @ConditionalOnProperty(prefix = "spring.cache", name = "type", havingValue = "redis")
     public CacheManager cacheManager(RedisConnectionFactory redisConnectionFactory) {
         RedisCacheConfiguration defaultConfig = baseConfig(Duration.ofSeconds(30));
 
@@ -42,6 +47,7 @@ public class CacheConfig {
         cacheConfigurations.put("companyPipeline", baseConfig(Duration.ofSeconds(Math.max(10, companyPipelineTtlSeconds))));
         cacheConfigurations.put("vacancyApplicants", baseConfig(Duration.ofSeconds(Math.max(10, applicantsTtlSeconds))));
         cacheConfigurations.put("userMatches", baseConfig(Duration.ofSeconds(Math.max(10, matchesTtlSeconds))));
+        cacheConfigurations.put("candidateApplications", baseConfig(Duration.ofSeconds(Math.max(10, applicationsTtlSeconds))));
 
         return RedisCacheManager.builder(redisConnectionFactory)
                 .cacheDefaults(defaultConfig)
@@ -61,4 +67,5 @@ public class CacheConfig {
                         RedisSerializationContext.SerializationPair
                 .fromSerializer(serializer));
     }
+
 }

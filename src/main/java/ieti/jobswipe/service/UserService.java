@@ -1,6 +1,7 @@
 package ieti.jobswipe.service;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.User;
@@ -19,10 +20,12 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<User> getAllUsers() {
         return userRepository.findAll();
     }
 
+    @Transactional(readOnly = true)
     public User getUserById(Long id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(ErrorMessages.USER_NOT_FOUND));

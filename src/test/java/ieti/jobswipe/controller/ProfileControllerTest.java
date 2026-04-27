@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import ieti.jobswipe.dto.CandidateExperienceRequest;
 import ieti.jobswipe.dto.CandidateProfileRequest;
 import ieti.jobswipe.dto.CompanyProfileRequest;
+import ieti.jobswipe.dto.ProfileResponse;
 import ieti.jobswipe.model.Profile;
 import ieti.jobswipe.model.Role;
 import ieti.jobswipe.service.ProfileService;
@@ -91,11 +92,23 @@ class ProfileControllerTest {
     void shouldReturn404WhenProfileByUserIdIsMissing() {
         when(profileService.getProfileByUserId(99L)).thenThrow(new RuntimeException("Profile not found"));
 
-        ResponseEntity<Profile> response = profileController.getProfileByUserId(99L);
+        ResponseEntity<ProfileResponse> response = profileController.getProfileByUserId(99L);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         verify(profileService, times(1)).getProfileByUserId(99L);
     }
+
+        @Test
+        void shouldGetProfileStatusByUserId() throws Exception {
+                when(profileService.hasProfileByUserId(1L)).thenReturn(true);
+
+                mockMvc.perform(get("/profiles/user/1/status").contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isOk())
+                                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(jsonPath("$.hasProfile", is(true)));
+
+                verify(profileService, times(1)).hasProfileByUserId(1L);
+        }
 
     @Test
     void shouldCreateCandidateProfile() throws Exception {

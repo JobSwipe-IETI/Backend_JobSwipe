@@ -1,39 +1,39 @@
 package ieti.jobswipe.controller;
 
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import static org.mockito.ArgumentMatchers.any;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.User;
+import ieti.jobswipe.repository.ProfileRepository;
 import ieti.jobswipe.security.AuthenticatedUser;
 import ieti.jobswipe.security.IdentityTokenVerifier;
 import ieti.jobswipe.security.InvalidIdentityTokenException;
 import ieti.jobswipe.security.JwtTokenService;
 import ieti.jobswipe.security.UserProvisioningService;
 import ieti.jobswipe.service.UserService;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.server.ResponseStatusException;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
 class AuthControllerTest {
@@ -49,6 +49,9 @@ class AuthControllerTest {
 
         @Mock
         private UserService userService;
+
+        @Mock
+        private ProfileRepository profileRepository;
 
         @InjectMocks
         private AuthController authController;
@@ -92,6 +95,7 @@ class AuthControllerTest {
                 when(identityTokenVerifier.verify(validIdToken)).thenReturn(testAuthenticatedUser);
                 when(userProvisioningService.ensureUserExists(testAuthenticatedUser)).thenReturn(testUser);
                 when(jwtTokenService.generateToken(testUser)).thenReturn(testTokenPayload);
+                when(profileRepository.existsByUserId(1L)).thenReturn(false);
 
                 mockMvc.perform(post("/api/auth/google")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -100,6 +104,7 @@ class AuthControllerTest {
                                 .andExpect(jsonPath("$.accessToken", is("jwt-token-123")))
                                 .andExpect(jsonPath("$.tokenType", is("Bearer")))
                                 .andExpect(jsonPath("$.expiresIn", is(3600)))
+                                .andExpect(jsonPath("$.hasProfile", is(false)))
                                 .andExpect(jsonPath("$.user.id", is(1)))
                                 .andExpect(jsonPath("$.user.email", is("john@example.com")))
                                 .andExpect(jsonPath("$.user.name", is("John Doe")))
@@ -108,6 +113,7 @@ class AuthControllerTest {
                 verify(identityTokenVerifier, times(1)).verify(validIdToken);
                 verify(userProvisioningService, times(1)).ensureUserExists(testAuthenticatedUser);
                 verify(jwtTokenService, times(1)).generateToken(testUser);
+                verify(profileRepository, times(1)).existsByUserId(1L);
         }
 
         @Test
@@ -157,6 +163,7 @@ class AuthControllerTest {
                 when(identityTokenVerifier.verify(validIdToken)).thenReturn(testAuthenticatedUser);
                 when(userProvisioningService.ensureUserExists(testAuthenticatedUser)).thenReturn(testUser);
                 when(jwtTokenService.generateToken(testUser)).thenReturn(testTokenPayload);
+                when(profileRepository.existsByUserId(1L)).thenReturn(false);
 
                 mockMvc.perform(post("/api/auth/google")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -165,6 +172,7 @@ class AuthControllerTest {
 
                 verify(userProvisioningService, times(1)).ensureUserExists(any(AuthenticatedUser.class));
                 verify(jwtTokenService, times(1)).generateToken(testUser);
+                verify(profileRepository, times(1)).existsByUserId(1L);
         }
 
         @Test
@@ -175,11 +183,13 @@ class AuthControllerTest {
                 when(identityTokenVerifier.verify(validIdToken)).thenReturn(testAuthenticatedUser);
                 when(userProvisioningService.ensureUserExists(testAuthenticatedUser)).thenReturn(testUser);
                 when(jwtTokenService.generateToken(testUser)).thenReturn(testTokenPayload);
+                when(profileRepository.existsByUserId(1L)).thenReturn(true);
 
                 mockMvc.perform(post("/api/auth/google")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.hasProfile", is(true)))
                                 .andExpect(jsonPath("$.user.id", notNullValue()))
                                 .andExpect(jsonPath("$.user.name", notNullValue()))
                                 .andExpect(jsonPath("$.user.email", notNullValue()))
@@ -219,6 +229,7 @@ class AuthControllerTest {
 
                 when(userService.updateUserRole(1L, Role.COMPANY)).thenReturn(updatedUser);
                 when(jwtTokenService.generateToken(updatedUser)).thenReturn(testTokenPayload);
+                when(profileRepository.existsByUserId(1L)).thenReturn(false);
 
                 AuthController.AuthTokenResponse response = authController
                                 .updateMyRole(request, jwt("1", "john@example.com", "John Doe"))

@@ -13,29 +13,35 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import ieti.jobswipe.dto.CandidateApplicationResponse;
-import ieti.jobswipe.dto.CompanyLikeActivityResponse;
+import ieti.jobswipe.dto.ChatRealtimeEventResponse;
 import ieti.jobswipe.dto.CompanyCandidateDecisionResponse;
+import ieti.jobswipe.dto.CompanyLikeActivityResponse;
 import ieti.jobswipe.dto.CompanyVacancyPipelineResponse;
 import ieti.jobswipe.dto.CreateVacancyRequest;
 import ieti.jobswipe.dto.MatchingResponse;
 import ieti.jobswipe.dto.UserMatchResponse;
 import ieti.jobswipe.dto.VacancyApplicantResponse;
+import ieti.jobswipe.dto.VacancyDetailResponse;
 import ieti.jobswipe.dto.VacancyRecommendationResponse;
-import ieti.jobswipe.model.CompanyCandidateDecision;
+import ieti.jobswipe.dto.VacancySummaryResponse;
 import ieti.jobswipe.exception.ErrorMessages;
 import ieti.jobswipe.exception.VacancyNotFoundException;
+import ieti.jobswipe.model.CompanyCandidateDecision;
 import ieti.jobswipe.model.EmploymentType;
 import ieti.jobswipe.model.ExperienceLevel;
 import ieti.jobswipe.model.Modality;
@@ -45,8 +51,8 @@ import ieti.jobswipe.model.SwipeDecisionType;
 import ieti.jobswipe.model.User;
 import ieti.jobswipe.model.Vacancy;
 import ieti.jobswipe.model.VacancySwipe;
-import ieti.jobswipe.repository.CompanyCandidateDecisionRepository;
 import ieti.jobswipe.repository.CandidateApplicationProjection;
+import ieti.jobswipe.repository.CompanyCandidateDecisionRepository;
 import ieti.jobswipe.repository.ProfileRepository;
 import ieti.jobswipe.repository.RecommendationCacheRepository;
 import ieti.jobswipe.repository.UserMatchProjection;
@@ -62,6 +68,8 @@ public class VacancyService {
     private static final String CACHE_COMPANY_PIPELINE = "companyPipeline";
     private static final String CACHE_VACANCY_APPLICANTS = "vacancyApplicants";
     private static final String CACHE_USER_MATCHES = "userMatches";
+    private static final String CACHE_CANDIDATE_APPLICATIONS = "candidateApplications";
+    private static final String CACHE_VACANCY_SUMMARIES_FOR_USER = "vacancySummariesForUser";
 
     public interface RecommendationProgressListener {
         void onProgress(int processed, int total, String message);
@@ -80,6 +88,9 @@ public class VacancyService {
     private final RecommendationCacheRepository recommendationCacheRepository;
     private final VacancySwipeRepository vacancySwipeRepository;
     private final CompanyCandidateDecisionRepository companyCandidateDecisionRepository;
+    private final CacheManager cacheManager;
+    @Autowired(required = false)
+    private ChatRealtimeService chatRealtimeService;
 
     @Value("${app.recommendations.cache.ttl-seconds:1800}")
     private long recommendationCacheTtlSeconds;
@@ -90,7 +101,8 @@ public class VacancyService {
             ProfileRepository profileRepository,
             RecommendationCacheRepository recommendationCacheRepository,
             VacancySwipeRepository vacancySwipeRepository,
-            CompanyCandidateDecisionRepository companyCandidateDecisionRepository) {
+            CompanyCandidateDecisionRepository companyCandidateDecisionRepository,
+            CacheManager cacheManager) {
         this.vacancyRepository = vacancyRepository;
         this.userRepository = userRepository;
         this.matchingService = matchingService;
@@ -98,6 +110,7 @@ public class VacancyService {
         this.recommendationCacheRepository = recommendationCacheRepository;
         this.vacancySwipeRepository = vacancySwipeRepository;
         this.companyCandidateDecisionRepository = companyCandidateDecisionRepository;
+        this.cacheManager = cacheManager;
     }
 
     public List<Vacancy> getAllVacancies() {
@@ -105,7 +118,7 @@ public class VacancyService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = CACHE_VACANCIES_FOR_USER, key = "#userId")
+    @Cacheable(value = CACHE_VACANCIES_FOR_USER, key = "#userId", sync = true)
     public List<Vacancy> getAllVacanciesForUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException(ErrorMessages.USER_NOT_FOUND));
@@ -135,7 +148,31 @@ public class VacancyService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = CACHE_COMPANY_ACTIVITY, key = "#companyId + ':' + #limit")
+    public List<VacancySummaryResponse> getVacancySummariesForUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException(ErrorMessages.USER_NOT_FOUND));
+
+        if (user.getRole() == Role.COMPANY) {
+            return vacancyRepository.findSummaryByCompanyId(userId);
+        }
+
+        Set<Long> swipedVacancyIds = new HashSet<>(vacancySwipeRepository.findSwipedVacancyIdsByUserId(userId));
+        if (swipedVacancyIds.isEmpty()) {
+            return vacancyRepository.findAllSummaries();
+        }
+
+        List<VacancySummaryResponse> optimized = vacancyRepository.findSummaryNotSwipedByUser(userId);
+        if (!optimized.isEmpty()) {
+            return optimized;
+        }
+
+        return vacancyRepository.findAllSummaries().stream()
+                .filter(vacancy -> !swipedVacancyIds.contains(vacancy.id()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    @Cacheable(value = CACHE_COMPANY_ACTIVITY, key = "#companyId + ':' + #limit", sync = true)
     public List<CompanyLikeActivityResponse> getCompanyLikeActivity(Long companyId, Integer limit) {
         int effectiveLimit = Math.max(1, Math.min(limit != null ? limit : 20, 100));
 
@@ -185,9 +222,7 @@ public class VacancyService {
 
             String candidateName = candidateNames.get(candidateId);
             if (candidateName == null) {
-                candidateName = userRepository.findById(candidateId)
-                        .map(User::getName)
-                        .orElse("Usuario " + candidateId);
+                candidateName = "Usuario " + candidateId;
             }
 
             activity.add(CompanyLikeActivityResponse.builder()
@@ -203,7 +238,7 @@ public class VacancyService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = CACHE_COMPANY_PIPELINE, key = "#companyId")
+    @Cacheable(value = CACHE_COMPANY_PIPELINE, key = "#companyId", sync = true)
     public List<CompanyVacancyPipelineResponse> getCompanyVacancyPipeline(Long companyId) {
         List<Vacancy> companyVacancies = vacancyRepository.findAllByCompanyId(companyId);
         List<CompanyVacancyPipelineResponse> pipeline = new ArrayList<>(companyVacancies.size());
@@ -247,7 +282,7 @@ public class VacancyService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = CACHE_VACANCY_APPLICANTS, key = "#companyId + ':' + #vacancyId + ':' + #limit")
+    @Cacheable(value = CACHE_VACANCY_APPLICANTS, key = "#companyId + ':' + #vacancyId + ':' + #limit", sync = true)
     public List<VacancyApplicantResponse> getApplicantsByVacancy(Long companyId, Long vacancyId, Integer limit) {
         int effectiveLimit = Math.max(1, Math.min(limit != null ? limit : 50, 200));
 
@@ -304,9 +339,7 @@ public class VacancyService {
 
             String candidateName = candidateNames.get(candidateId);
             if (candidateName == null) {
-                candidateName = userRepository.findById(candidateId)
-                        .map(User::getName)
-                        .orElse("Usuario " + candidateId);
+                candidateName = "Usuario " + candidateId;
             }
 
             applicants.add(VacancyApplicantResponse.builder()
@@ -323,19 +356,22 @@ public class VacancyService {
     }
 
     @Transactional(readOnly = true)
-    public Vacancy getVacancyById(Long id) {
-        return vacancyRepository.findById(id)
-                .orElseThrow(() -> new VacancyNotFoundException(ErrorMessages.VACANCY_NOT_FOUND));
+    public VacancyDetailResponse getVacancyById(Long id) {
+        return mapVacancyDetail(
+                vacancyRepository.findById(id)
+                        .orElseThrow(() -> new VacancyNotFoundException(ErrorMessages.VACANCY_NOT_FOUND)));
     }
 
         @Caching(evict = {
             @CacheEvict(value = CACHE_VACANCIES_FOR_USER, allEntries = true),
+            @CacheEvict(value = CACHE_VACANCY_SUMMARIES_FOR_USER, allEntries = true),
             @CacheEvict(value = CACHE_COMPANY_ACTIVITY, allEntries = true),
             @CacheEvict(value = CACHE_COMPANY_PIPELINE, allEntries = true),
             @CacheEvict(value = CACHE_VACANCY_APPLICANTS, allEntries = true),
-            @CacheEvict(value = CACHE_USER_MATCHES, allEntries = true)
+            @CacheEvict(value = CACHE_USER_MATCHES, allEntries = true),
+            @CacheEvict(value = CACHE_CANDIDATE_APPLICATIONS, allEntries = true)
         })
-    public Vacancy createVacancy(CreateVacancyRequest request, Long companyId) {
+    public VacancyDetailResponse createVacancy(CreateVacancyRequest request, Long companyId) {
         User company = userRepository.findById(companyId)
                 .orElseThrow(() -> new RuntimeException(ErrorMessages.COMPANY_NOT_FOUND));
 
@@ -361,17 +397,19 @@ public class VacancyService {
                 .company(company)
                 .build();
 
-        return vacancyRepository.save(vacancy);
+        return mapVacancyDetail(vacancyRepository.save(vacancy));
     }
 
         @Caching(evict = {
             @CacheEvict(value = CACHE_VACANCIES_FOR_USER, allEntries = true),
+            @CacheEvict(value = CACHE_VACANCY_SUMMARIES_FOR_USER, allEntries = true),
             @CacheEvict(value = CACHE_COMPANY_ACTIVITY, allEntries = true),
             @CacheEvict(value = CACHE_COMPANY_PIPELINE, allEntries = true),
             @CacheEvict(value = CACHE_VACANCY_APPLICANTS, allEntries = true),
-            @CacheEvict(value = CACHE_USER_MATCHES, allEntries = true)
+            @CacheEvict(value = CACHE_USER_MATCHES, allEntries = true),
+            @CacheEvict(value = CACHE_CANDIDATE_APPLICATIONS, allEntries = true)
         })
-    public Vacancy updateVacancy(Long id, CreateVacancyRequest request) {
+    public VacancyDetailResponse updateVacancy(Long id, CreateVacancyRequest request) {
         Vacancy existing = vacancyRepository.findById(id)
                 .orElseThrow(() -> new VacancyNotFoundException(ErrorMessages.VACANCY_NOT_FOUND));
 
@@ -390,29 +428,30 @@ public class VacancyService {
         existing.setMaxSalary(request.getMaxSalary());
         existing.setBenefits(orEmpty(request.getBenefits()));
 
-        return vacancyRepository.save(existing);
+        return mapVacancyDetail(vacancyRepository.save(existing));
     }
 
         @Caching(evict = {
             @CacheEvict(value = CACHE_VACANCIES_FOR_USER, allEntries = true),
+            @CacheEvict(value = CACHE_VACANCY_SUMMARIES_FOR_USER, allEntries = true),
             @CacheEvict(value = CACHE_COMPANY_ACTIVITY, allEntries = true),
             @CacheEvict(value = CACHE_COMPANY_PIPELINE, allEntries = true),
             @CacheEvict(value = CACHE_VACANCY_APPLICANTS, allEntries = true),
-            @CacheEvict(value = CACHE_USER_MATCHES, allEntries = true)
+            @CacheEvict(value = CACHE_USER_MATCHES, allEntries = true),
+            @CacheEvict(value = CACHE_CANDIDATE_APPLICATIONS, allEntries = true)
         })
     public void deleteVacancy(Long id) {
         Vacancy existing = vacancyRepository.findById(id)
                 .orElseThrow(() -> new VacancyNotFoundException(ErrorMessages.VACANCY_NOT_FOUND));
+
+        // Borrar relaciones asociadas
+        vacancySwipeRepository.deleteByVacancyId(id);
+        companyCandidateDecisionRepository.deleteByVacancyId(id);
+        recommendationCacheRepository.deleteByVacancyId(id);
+
         vacancyRepository.delete(existing);
     }
 
-        @Caching(evict = {
-            @CacheEvict(value = CACHE_VACANCIES_FOR_USER, allEntries = true),
-            @CacheEvict(value = CACHE_COMPANY_ACTIVITY, allEntries = true),
-            @CacheEvict(value = CACHE_COMPANY_PIPELINE, allEntries = true),
-            @CacheEvict(value = CACHE_VACANCY_APPLICANTS, allEntries = true),
-            @CacheEvict(value = CACHE_USER_MATCHES, allEntries = true)
-        })
         public void registerSwipeDecision(Long userId, Long vacancyId, SwipeDecisionType decision) {
         Vacancy vacancy = vacancyRepository.findById(vacancyId)
             .orElseThrow(() -> new VacancyNotFoundException(ErrorMessages.VACANCY_NOT_FOUND));
@@ -423,14 +462,53 @@ public class VacancyService {
         entity.setVacancyId(vacancy.getId());
         entity.setDecision(decision);
         vacancySwipeRepository.save(entity);
+        invalidateSwipeCaches(userId, vacancy);
+
+        if (decision == SwipeDecisionType.LIKE && vacancy.getCompany() != null) {
+            Long companyId = vacancy.getCompany().getId();
+            String vacancyTitle = StringUtils.hasText(vacancy.getTitle()) ? vacancy.getTitle() : "Vacante";
+            User candidate = userRepository.findById(userId).orElse(null);
+            String candidateName = candidate != null && StringUtils.hasText(candidate.getName())
+                ? candidate.getName()
+                : "Candidato";
+
+            boolean matched = companyCandidateDecisionRepository
+                .existsByCompanyIdAndCandidateIdAndVacancyIdAndDecision(
+                    companyId,
+                    userId,
+                    vacancyId,
+                    SwipeDecisionType.LIKE);
+
+            Map<String, Object> companyLikePayload = new HashMap<>();
+            companyLikePayload.put("actorUserId", userId);
+            companyLikePayload.put("vacancyId", vacancyId);
+            companyLikePayload.put("vacancyTitle", vacancyTitle);
+            companyLikePayload.put("candidateId", userId);
+            companyLikePayload.put("candidateName", candidateName);
+            companyLikePayload.put("matched", matched);
+            publishRealtimeNotification(companyId, "notification.company_like", companyLikePayload);
+
+            if (matched) {
+            Map<String, Object> candidateMatchPayload = new HashMap<>();
+            candidateMatchPayload.put("actorUserId", userId);
+            candidateMatchPayload.put("vacancyId", vacancyId);
+            candidateMatchPayload.put("vacancyTitle", vacancyTitle);
+            candidateMatchPayload.put("counterpartId", companyId);
+            candidateMatchPayload.put("counterpartName", vacancy.getCompany().getName());
+
+            Map<String, Object> companyMatchPayload = new HashMap<>();
+            companyMatchPayload.put("actorUserId", userId);
+            companyMatchPayload.put("vacancyId", vacancyId);
+            companyMatchPayload.put("vacancyTitle", vacancyTitle);
+            companyMatchPayload.put("counterpartId", userId);
+            companyMatchPayload.put("counterpartName", candidateName);
+
+            publishRealtimeNotification(userId, "notification.match", candidateMatchPayload);
+            publishRealtimeNotification(companyId, "notification.match", companyMatchPayload);
+            }
+        }
         }
 
-        @Caching(evict = {
-            @CacheEvict(value = CACHE_COMPANY_ACTIVITY, allEntries = true),
-            @CacheEvict(value = CACHE_COMPANY_PIPELINE, allEntries = true),
-            @CacheEvict(value = CACHE_VACANCY_APPLICANTS, allEntries = true),
-            @CacheEvict(value = CACHE_USER_MATCHES, allEntries = true)
-        })
         public CompanyCandidateDecisionResponse registerCompanyCandidateDecision(
             Long companyId,
             Long vacancyId,
@@ -502,6 +580,40 @@ public class VacancyService {
             vacancyId,
             SwipeDecisionType.LIKE);
         boolean matched = decision == SwipeDecisionType.LIKE && candidateLikedVacancy;
+        invalidateCompanyDecisionCaches(companyId, candidateId, vacancyId);
+
+        String vacancyTitle = StringUtils.hasText(vacancy.getTitle()) ? vacancy.getTitle() : "Vacante";
+        String companyName = StringUtils.hasText(company.getName()) ? company.getName() : "Empresa";
+        String candidateName = StringUtils.hasText(candidate.getName()) ? candidate.getName() : "Candidato";
+
+        Map<String, Object> candidateDecisionPayload = new HashMap<>();
+        candidateDecisionPayload.put("actorUserId", companyId);
+        candidateDecisionPayload.put("vacancyId", vacancyId);
+        candidateDecisionPayload.put("vacancyTitle", vacancyTitle);
+        candidateDecisionPayload.put("companyId", companyId);
+        candidateDecisionPayload.put("companyName", companyName);
+        candidateDecisionPayload.put("decision", decision.name());
+        candidateDecisionPayload.put("matched", matched);
+        publishRealtimeNotification(candidateId, "notification.company_decision", candidateDecisionPayload);
+
+        if (matched) {
+            Map<String, Object> candidateMatchPayload = new HashMap<>();
+            candidateMatchPayload.put("actorUserId", companyId);
+            candidateMatchPayload.put("vacancyId", vacancyId);
+            candidateMatchPayload.put("vacancyTitle", vacancyTitle);
+            candidateMatchPayload.put("counterpartId", companyId);
+            candidateMatchPayload.put("counterpartName", companyName);
+
+            Map<String, Object> companyMatchPayload = new HashMap<>();
+            companyMatchPayload.put("actorUserId", companyId);
+            companyMatchPayload.put("vacancyId", vacancyId);
+            companyMatchPayload.put("vacancyTitle", vacancyTitle);
+            companyMatchPayload.put("counterpartId", candidateId);
+            companyMatchPayload.put("counterpartName", candidateName);
+
+            publishRealtimeNotification(candidateId, "notification.match", candidateMatchPayload);
+            publishRealtimeNotification(companyId, "notification.match", companyMatchPayload);
+        }
 
         return CompanyCandidateDecisionResponse.builder()
             .companyId(companyId)
@@ -521,6 +633,7 @@ public class VacancyService {
         }
 
         @Transactional(readOnly = true)
+        @Cacheable(value = CACHE_CANDIDATE_APPLICATIONS, key = "#candidateId + ':' + #limit", sync = true)
         public List<CandidateApplicationResponse> getCandidateApplications(Long candidateId, Integer limit) {
             User candidate = userRepository.findById(candidateId)
                     .orElseThrow(() -> new RuntimeException(ErrorMessages.USER_NOT_FOUND));
@@ -565,7 +678,7 @@ public class VacancyService {
         }
 
         @Transactional(readOnly = true)
-        @Cacheable(value = CACHE_USER_MATCHES, key = "#userId + ':' + #limit")
+        @Cacheable(value = CACHE_USER_MATCHES, key = "#userId + ':' + #limit", sync = true)
         public List<UserMatchResponse> getMatchesForUser(Long userId, Integer limit) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException(ErrorMessages.USER_NOT_FOUND));
@@ -605,6 +718,89 @@ public class VacancyService {
                         .build());
             }
             return matches;
+        }
+
+        private void invalidateSwipeCaches(Long candidateId, Vacancy vacancy) {
+            evictUserScopedVacancyCaches(candidateId);
+            evictCandidateScopedCaches(candidateId);
+
+            if (vacancy.getCompany() == null || vacancy.getCompany().getId() == null) {
+                return;
+            }
+
+            Long companyId = vacancy.getCompany().getId();
+            Long vacancyId = vacancy.getId();
+            evictCompanyActivity(companyId);
+            evictCompanyPipeline(companyId);
+            evictVacancyApplicants(companyId, vacancyId);
+            evictUserMatches(companyId);
+        }
+
+        private void invalidateCompanyDecisionCaches(Long companyId, Long candidateId, Long vacancyId) {
+            evictCompanyActivity(companyId);
+            evictCompanyPipeline(companyId);
+            evictVacancyApplicants(companyId, vacancyId);
+            evictUserMatches(companyId);
+
+            evictCandidateScopedCaches(candidateId);
+            evictUserMatches(candidateId);
+        }
+
+        private void evictUserScopedVacancyCaches(Long userId) {
+            evictCacheKey(CACHE_VACANCIES_FOR_USER, userId);
+            evictCacheKey(CACHE_VACANCY_SUMMARIES_FOR_USER, userId);
+        }
+
+        private void evictCandidateScopedCaches(Long candidateId) {
+            for (int limit : new int[] { 30, 50, 100 }) {
+                evictCacheKey(CACHE_CANDIDATE_APPLICATIONS, candidateId + ":" + limit);
+            }
+        }
+
+        private void evictCompanyActivity(Long companyId) {
+            for (int limit : new int[] { 20, 50, 100 }) {
+                evictCacheKey(CACHE_COMPANY_ACTIVITY, companyId + ":" + limit);
+            }
+        }
+
+        private void evictCompanyPipeline(Long companyId) {
+            evictCacheKey(CACHE_COMPANY_PIPELINE, companyId);
+        }
+
+        private void evictVacancyApplicants(Long companyId, Long vacancyId) {
+            for (int limit : new int[] { 20, 50, 100, 200 }) {
+                evictCacheKey(CACHE_VACANCY_APPLICANTS, companyId + ":" + vacancyId + ":" + limit);
+            }
+        }
+
+        private void evictUserMatches(Long userId) {
+            for (int limit : new int[] { 20, 30, 50, 100 }) {
+                evictCacheKey(CACHE_USER_MATCHES, userId + ":" + limit);
+            }
+        }
+
+        private void evictCacheKey(String cacheName, Object key) {
+            if (cacheManager == null || key == null) {
+                return;
+            }
+
+            Cache cache = cacheManager.getCache(cacheName);
+            if (cache != null) {
+                cache.evict(key);
+            }
+        }
+
+        private void publishRealtimeNotification(Long userId, String type, Map<String, Object> payload) {
+            if (chatRealtimeService == null || userId == null || !StringUtils.hasText(type)) {
+                return;
+            }
+
+            chatRealtimeService.publishToUser(
+                    userId,
+                    ChatRealtimeEventResponse.builder()
+                            .type(type)
+                            .payload(payload)
+                            .build());
         }
 
         private String normalizeText(String value, int maxLen) {
@@ -664,6 +860,27 @@ public class VacancyService {
             }
 
             return ExperienceLevel.valueOf(normalized);
+        }
+
+        private VacancyDetailResponse mapVacancyDetail(Vacancy vacancy) {
+            return new VacancyDetailResponse(
+                    vacancy.getId(),
+                    vacancy.getTitle(),
+                    vacancy.getDescription(),
+                    vacancy.getLocation(),
+                    vacancy.getSector(),
+                    vacancy.getModality() != null ? vacancy.getModality().name() : null,
+                    vacancy.getEmploymentType() != null ? vacancy.getEmploymentType().name() : null,
+                    vacancy.getExperienceLevel() != null ? vacancy.getExperienceLevel().name() : null,
+                    vacancy.getTechnologies() != null ? List.copyOf(vacancy.getTechnologies()) : List.of(),
+                    vacancy.getSoftSkills() != null ? List.copyOf(vacancy.getSoftSkills()) : List.of(),
+                    vacancy.getResponsibilities() != null ? List.copyOf(vacancy.getResponsibilities()) : List.of(),
+                    vacancy.getTechnicalRequirements() != null ? List.copyOf(vacancy.getTechnicalRequirements()) : List.of(),
+                    vacancy.getMinSalary(),
+                    vacancy.getMaxSalary(),
+                    vacancy.getBenefits() != null ? List.copyOf(vacancy.getBenefits()) : List.of(),
+                    vacancy.getCompany() != null ? vacancy.getCompany().getId() : null,
+                    vacancy.getCompany() != null ? vacancy.getCompany().getName() : null);
         }
 
     public List<VacancyRecommendationResponse> getRecommendedVacancies(Long userId, Float minScore, Integer limit) {

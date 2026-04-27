@@ -30,6 +30,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import ieti.jobswipe.security.RestAuthenticationEntryPoint;
 
 @Configuration
@@ -40,6 +42,11 @@ public class SecurityConfig {
     private static final String[] PUBLIC_ENDPOINTS = {
             "/api/health",
             "/api/auth/google",
+            "/actuator/health",
+            "/actuator/info",
+            "/actuator/metrics",
+            "/actuator/metrics/**",
+            "/actuator/prometheus",
             "/swagger-ui.html",
             "/swagger-ui/**",
             "/v3/api-docs/**"
@@ -111,6 +118,12 @@ public class SecurityConfig {
                 .map(String::trim)
                 .filter(origin -> !origin.isEmpty())
                 .toList();
+    }
+
+    // Bean global de ObjectMapper para inyección
+    @Bean
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper();
     }
 }
 

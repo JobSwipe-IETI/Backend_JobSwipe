@@ -1,7 +1,16 @@
 package ieti.jobswipe.service;
 
+import java.util.Optional;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import ieti.jobswipe.dto.CandidateProfileRequest;
 import ieti.jobswipe.dto.CompanyProfileRequest;
 import ieti.jobswipe.exception.ErrorMessages;
@@ -16,13 +25,6 @@ import ieti.jobswipe.repository.CandidateProfileRepository;
 import ieti.jobswipe.repository.CompanyProfileRepository;
 import ieti.jobswipe.repository.ProfileRepository;
 import ieti.jobswipe.repository.UserRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.Optional;
 
 @Service
 @Transactional
@@ -46,23 +48,19 @@ public class ProfileService {
         this.userRepository = userRepository;
     }
 
+    @Transactional(readOnly = true)
     public Profile getProfileByUserId(Long userId) {
-        logger.info("🔎 ProfileService.getProfileByUserId called with userId={}", userId);
-        var profile = profileRepository.findByUserId(userId);
-        logger.info("📊 findByUserId({}) returned: {}", userId, profile.isPresent() ? "FOUND" : "NOT FOUND");
-        
-        // Inicializar los campos LOB dentro de la transacción
-        Profile result = profile.orElseThrow(() -> new ProfileNotFoundException(ErrorMessages.PROFILE_NOT_FOUND));
-        // Acceder a los campos LOB para provocar que se carguen
-        String skills = result.getSkills();
-        String experience = result.getExperience();
-        String education = result.getEducation();
-        logger.info("✅ LOB fields initialized: skills={}, experience={}, education={}", 
-            skills != null ? "OK" : "NULL", 
-            experience != null ? "OK" : "NULL",
-            education != null ? "OK" : "NULL");
-        
-        return result;
+        long queryStart = System.nanoTime();
+        Profile profile = profileRepository.findByUserId(userId)
+            .orElseThrow(() -> new ProfileNotFoundException(ErrorMessages.PROFILE_NOT_FOUND));
+        long queryMs = (System.nanoTime() - queryStart) / 1_000_000;
+        logger.info("⏱️ ProfileService.findByUserId userId={} took {} ms", userId, queryMs);
+        return profile;
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasProfileByUserId(Long userId) {
+        return profileRepository.existsByUserId(userId);
     }
 
     public Profile upsertCandidateProfile(Long userId, CandidateProfileRequest request) {

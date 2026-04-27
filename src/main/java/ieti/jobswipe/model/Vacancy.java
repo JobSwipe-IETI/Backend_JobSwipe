@@ -69,25 +69,25 @@ public class Vacancy {
     @Column
     private String sector;
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "vacancy_technologies", joinColumns = @JoinColumn(name = "vacancy_id"))
     @Column(name = "technology")
     @Builder.Default
     private List<String> technologies = new ArrayList<>();
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "vacancy_soft_skills", joinColumns = @JoinColumn(name = "vacancy_id"))
     @Column(name = "skill")
     @Builder.Default
     private List<String> softSkills = new ArrayList<>();
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "vacancy_responsibilities", joinColumns = @JoinColumn(name = "vacancy_id"))
     @Column(name = "responsibility")
     @Builder.Default
     private List<String> responsibilities = new ArrayList<>();
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "vacancy_technical_requirements", joinColumns = @JoinColumn(name = "vacancy_id"))
     @Column(name = "requirement")
     @Builder.Default
@@ -99,7 +99,7 @@ public class Vacancy {
     @Column(nullable = false)
     private Double maxSalary;
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "vacancy_benefits", joinColumns = @JoinColumn(name = "vacancy_id"))
     @Column(name = "benefit")
     @Builder.Default

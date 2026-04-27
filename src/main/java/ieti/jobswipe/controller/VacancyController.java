@@ -26,10 +26,11 @@ import ieti.jobswipe.dto.CompanyCandidateDecisionResponse;
 import ieti.jobswipe.dto.CompanyVacancyPipelineResponse;
 import ieti.jobswipe.dto.CreateVacancyRequest;
 import ieti.jobswipe.dto.UserMatchResponse;
+import ieti.jobswipe.dto.VacancyDetailResponse;
 import ieti.jobswipe.dto.VacancyApplicantResponse;
 import ieti.jobswipe.dto.VacancyRecommendationResponse;
+import ieti.jobswipe.dto.VacancySummaryResponse;
 import ieti.jobswipe.model.SwipeDecisionType;
-import ieti.jobswipe.model.Vacancy;
 import ieti.jobswipe.service.RecommendationJobService;
 import ieti.jobswipe.service.VacancyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -55,9 +56,9 @@ public class VacancyController {
     @GetMapping
     @Operation(summary = "Get all vacancies")
     @ApiResponse(responseCode = "200", description = "Vacancies retrieved successfully")
-    public ResponseEntity<List<Vacancy>> getAllVacancies(@AuthenticationPrincipal Jwt jwt) {
+    public ResponseEntity<List<VacancySummaryResponse>> getAllVacancies(@AuthenticationPrincipal Jwt jwt) {
         Long userId = Long.parseLong(jwt.getSubject());
-        return ResponseEntity.ok(vacancyService.getAllVacanciesForUser(userId));
+        return ResponseEntity.ok(vacancyService.getVacancySummariesForUser(userId));
     }
 
     @GetMapping("/recommended")
@@ -334,7 +335,7 @@ public class VacancyController {
         @ApiResponse(responseCode = "200", description = "Vacancy found"),
         @ApiResponse(responseCode = "404", description = "Vacancy not found")
     })
-    public ResponseEntity<Vacancy> getVacancyById(@PathVariable Long id) {
+    public ResponseEntity<VacancyDetailResponse> getVacancyById(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(vacancyService.getVacancyById(id));
         } catch (RuntimeException ex) {
@@ -349,12 +350,12 @@ public class VacancyController {
         @ApiResponse(responseCode = "400", description = "Invalid data or user is not a company"),
         @ApiResponse(responseCode = "404", description = "Company not found")
     })
-    public ResponseEntity<Vacancy> createVacancy(
+    public ResponseEntity<VacancyDetailResponse> createVacancy(
             @RequestBody CreateVacancyRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         try {
             Long companyId = Long.parseLong(jwt.getSubject());
-            Vacancy created = vacancyService.createVacancy(request, companyId);
+            VacancyDetailResponse created = vacancyService.createVacancy(request, companyId);
             return ResponseEntity.status(HttpStatus.CREATED).body(created);
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
@@ -370,7 +371,7 @@ public class VacancyController {
         @ApiResponse(responseCode = "400", description = "Invalid data"),
         @ApiResponse(responseCode = "404", description = "Vacancy not found")
     })
-    public ResponseEntity<Vacancy> updateVacancy(
+    public ResponseEntity<VacancyDetailResponse> updateVacancy(
             @PathVariable Long id,
             @RequestBody CreateVacancyRequest request) {
         try {

@@ -13,6 +13,8 @@ import ieti.jobswipe.model.VacancySwipe;
 
 public interface VacancySwipeRepository extends JpaRepository<VacancySwipe, Long> {
 
+    void deleteByVacancyId(Long vacancyId);
+
     Optional<VacancySwipe> findByUserIdAndVacancyId(Long userId, Long vacancyId);
 
     boolean existsByUserIdAndVacancyIdAndDecision(Long userId, Long vacancyId, SwipeDecisionType decision);
