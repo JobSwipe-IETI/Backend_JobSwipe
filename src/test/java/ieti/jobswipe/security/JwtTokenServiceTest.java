@@ -2,7 +2,7 @@ package ieti.jobswipe.security;
 
 import ieti.jobswipe.config.JwtProperties;
 import ieti.jobswipe.model.Role;
-import ieti.jobswipe.model.User;
+import ieti.jobswipe.model.entity.User;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -26,6 +26,7 @@ class JwtTokenServiceTest {
         JwtProperties jwtProperties = new JwtProperties();
         jwtProperties.setIssuer("jobswipe");
         jwtProperties.setAccessTokenExpirationSeconds(3600L);
+        jwtProperties.setRefreshTokenExpirationSeconds(86400L);
         jwtProperties.setSecret("01234567890123456789012345678901");
 
         when(encodedJwt.getTokenValue()).thenReturn("signed-token");
@@ -55,9 +56,40 @@ class JwtTokenServiceTest {
         assertEquals("COMPANY", claims.getClaim("role"));
         assertEquals("google-123", claims.getClaim("googleId"));
         assertEquals("https://avatar", claims.getClaim("avatarUrl"));
+        assertEquals("access", claims.getClaim("token_use"));
         assertTrue(claims.getExpiresAt().isAfter(claims.getIssuedAt()));
 
         verify(jwtEncoder).encode(captor.getValue());
+    }
+
+    @Test
+    void shouldGenerateRefreshTokenWithMinimalClaims() {
+        JwtEncoder jwtEncoder = mock(JwtEncoder.class);
+        Jwt encodedJwt = mock(Jwt.class);
+        JwtProperties jwtProperties = new JwtProperties();
+        jwtProperties.setIssuer("jobswipe");
+        jwtProperties.setAccessTokenExpirationSeconds(3600L);
+        jwtProperties.setRefreshTokenExpirationSeconds(86400L);
+        jwtProperties.setSecret("01234567890123456789012345678901");
+
+        when(encodedJwt.getTokenValue()).thenReturn("refresh-token");
+        ArgumentCaptor<JwtEncoderParameters> captor = ArgumentCaptor.forClass(JwtEncoderParameters.class);
+        when(jwtEncoder.encode(captor.capture())).thenReturn(encodedJwt);
+
+        JwtTokenService service = new JwtTokenService(jwtEncoder, jwtProperties);
+        User user = User.builder().id(9L).role(Role.CANDIDATE).build();
+
+        JwtTokenService.TokenPayload refreshToken = service.generateRefreshToken(user);
+
+        assertEquals("refresh-token", refreshToken.accessToken());
+        assertEquals(86400L, refreshToken.expiresIn());
+
+        JwtClaimsSet claims = captor.getValue().getClaims();
+        assertEquals("jobswipe", claims.getClaims().get("iss"));
+        assertEquals("9", claims.getSubject());
+        assertEquals("refresh", claims.getClaim("token_use"));
+        assertTrue(claims.getClaims().get("email") == null);
+        assertTrue(claims.getClaims().get("role") == null);
     }
 }
 

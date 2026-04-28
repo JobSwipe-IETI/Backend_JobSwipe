@@ -1,0 +1,321 @@
+[
+  {
+    "Class": "ChatRealtimeService",
+    "Method": "isConfigured()Z",
+    "MissedLines": [],
+    "MissedBranchLines": [
+      69,
+      70,
+      71
+    ]
+  },
+  {
+    "Class": "ChatRealtimeService",
+    "Method": "publishToUser(Ljava/lang/Long;Lieti/jobswipe/dto/chat/ChatRealtimeEventResponse;)V",
+    "MissedLines": [
+      58
+    ],
+    "MissedBranchLines": [
+      43,
+      58
+    ]
+  },
+  {
+    "Class": "ChatRealtimeService",
+    "Method": "stripTrailingSlash(Ljava/lang/String;)Ljava/lang/String;",
+    "MissedLines": [
+      76,
+      78
+    ],
+    "MissedBranchLines": [
+      75,
+      78
+    ]
+  },
+  {
+    "Class": "ChatService",
+    "Method": "buildPreview(Ljava/lang/String;)Ljava/lang/String;",
+    "MissedLines": [
+      284,
+      287
+    ],
+    "MissedBranchLines": [
+      283,
+      286
+    ]
+  },
+  {
+    "Class": "ChatService",
+    "Method": "buildSummaryForConversation(Lieti/jobswipe/model/entity/ChatConversation;Lieti/jobswipe/model/entity/User;)Lieti/jobswipe/dto/chat/ConversationSummaryResponse;",
+    "MissedLines": [
+      198,
+      204
+    ],
+    "MissedBranchLines": [
+      196,
+      202,
+      209
+    ]
+  },
+  {
+    "Class": "ChatService",
+    "Method": "lambda$getAccessibleConversation$3()Ljava/lang/RuntimeException;",
+    "MissedLines": [
+      268
+    ],
+    "MissedBranchLines": []
+  },
+  {
+    "Class": "ChatService",
+    "Method": "lambda$getRequiredUser$2()Ljava/lang/RuntimeException;",
+    "MissedLines": [
+      263
+    ],
+    "MissedBranchLines": []
+  },
+  {
+    "Class": "ChatService",
+    "Method": "lambda$startConversation$0()Ljava/lang/RuntimeException;",
+    "MissedLines": [
+      80,
+      82,
+      92
+    ],
+    "MissedBranchLines": [
+      81,
+      91
+    ]
+  },
+  {
+    "Class": "ChatService",
+    "Method": "markConversationAsRead(Ljava/lang/Long;Ljava/lang/Long;)V",
+    "MissedLines": [
+      176,
+      177
+    ],
+    "MissedBranchLines": [
+      175,
+      182
+    ]
+  },
+  {
+    "Class": "ChatService",
+    "Method": "normalizeMessageContent(Ljava/lang/String;)Ljava/lang/String;",
+    "MissedLines": [
+      279
+    ],
+    "MissedBranchLines": [
+      276
+    ]
+  },
+  {
+    "Class": "ChatService",
+    "Method": "sendMessage(Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/String;)Lieti/jobswipe/dto/chat/ChatMessageResponse;",
+    "MissedLines": [
+      155
+    ],
+    "MissedBranchLines": [
+      152
+    ]
+  },
+  {
+    "Class": "GoogleIdentityTokenVerifier",
+    "Method": "lambda$verify$0(Ljava/util/Map$Entry;)Z",
+    "MissedLines": [
+      67
+    ],
+    "MissedBranchLines": []
+  },
+  {
+    "Class": "GoogleIdentityTokenVerifier",
+    "Method": "verify(Ljava/lang/String;)Lieti/jobswipe/security/AuthenticatedUser;",
+    "MissedLines": [
+      41,
+      42
+    ],
+    "MissedBranchLines": [
+      41,
+      66
+    ]
+  },
+  {
+    "Class": "ProfileController",
+    "Method": "getProfileByUserId(Ljava/lang/Long;)Lorg/springframework/http/ResponseEntity;",
+    "MissedLines": [],
+    "MissedBranchLines": [
+      61
+    ]
+  },
+  {
+    "Class": "ProfileController",
+    "Method": "invalidateProfileCache([Ljava/lang/Long;)V",
+    "MissedLines": [
+      189
+    ],
+    "MissedBranchLines": [
+      188,
+      192
+    ]
+  },
+  {
+    "Class": "SupabaseChatRealtimePublisher",
+    "Method": "isConfigured()Z",
+    "MissedLines": [],
+    "MissedBranchLines": [
+      76,
+      77,
+      79
+    ]
+  },
+  {
+    "Class": "SupabaseChatRealtimePublisher",
+    "Method": "publishMessage(Lieti/jobswipe/dto/chat/ChatMessageResponse;)V",
+    "MissedLines": [],
+    "MissedBranchLines": [
+      45
+    ]
+  },
+  {
+    "Class": "SupabaseChatRealtimePublisher",
+    "Method": "stripTrailingSlash(Ljava/lang/String;)Ljava/lang/String;",
+    "MissedLines": [
+      84,
+      86
+    ],
+    "MissedBranchLines": [
+      83,
+      86
+    ]
+  },
+  {
+    "Class": "UserProvisioningService",
+    "Method": "cacheUser(Lieti/jobswipe/model/entity/User;)V",
+    "MissedLines": [],
+    "MissedBranchLines": [
+      128,
+      131
+    ]
+  },
+  {
+    "Class": "UserProvisioningService",
+    "Method": "getCachedUser(Ljava/lang/String;Ljava/lang/String;)Lieti/jobswipe/security/UserProvisioningService$CachedUserSnapshot;",
+    "MissedLines": [
+      102,
+      111
+    ],
+    "MissedBranchLines": [
+      99,
+      108
+    ]
+  },
+  {
+    "Class": "UserProvisioningService",
+    "Method": "normalizeEmail(Ljava/lang/String;)Ljava/lang/String;",
+    "MissedLines": [
+      137
+    ],
+    "MissedBranchLines": [
+      137
+    ]
+  },
+  {
+    "Class": "VacancyService",
+    "Method": "evictCacheKey(Ljava/lang/String;Ljava/lang/Object;)V",
+    "MissedLines": [
+      786
+    ],
+    "MissedBranchLines": [
+      785
+    ]
+  },
+  {
+    "Class": "VacancyService",
+    "Method": "getCompanyLikeActivity(Ljava/lang/Long;Ljava/lang/Integer;)Ljava/util/List;",
+    "MissedLines": [
+      200
+    ],
+    "MissedBranchLines": [
+      198
+    ]
+  },
+  {
+    "Class": "VacancyService",
+    "Method": "invalidateSwipeCaches(Ljava/lang/Long;Lieti/jobswipe/model/entity/Vacancy;)V",
+    "MissedLines": [
+      730
+    ],
+    "MissedBranchLines": [
+      729
+    ]
+  },
+  {
+    "Class": "VacancyService",
+    "Method": "lambda$getVacancySummariesForUser$1()Ljava/lang/RuntimeException;",
+    "MissedLines": [
+      155
+    ],
+    "MissedBranchLines": []
+  },
+  {
+    "Class": "VacancyService",
+    "Method": "lambda$registerCompanyCandidateDecision$12()Lieti/jobswipe/exception/VacancyNotFoundException;",
+    "MissedLines": [
+      587,
+      588,
+      589
+    ],
+    "MissedBranchLines": [
+      587,
+      588,
+      589
+    ]
+  },
+  {
+    "Class": "VacancyService",
+    "Method": "lambda$registerSwipeDecision$9()Lieti/jobswipe/exception/VacancyNotFoundException;",
+    "MissedLines": [
+      471
+    ],
+    "MissedBranchLines": [
+      469,
+      471,
+      473
+    ]
+  },
+  {
+    "Class": "VacancyService",
+    "Method": "mapVacancyDetail(Lieti/jobswipe/model/entity/Vacancy;)Lieti/jobswipe/dto/vacancy/VacancyDetailResponse;",
+    "MissedLines": [
+      874,
+      875,
+      876,
+      877,
+      878,
+      879,
+      880,
+      883,
+      884,
+      885
+    ],
+    "MissedBranchLines": [
+      874,
+      875,
+      876,
+      877,
+      878,
+      879,
+      880,
+      883,
+      884,
+      885
+    ]
+  },
+  {
+    "Class": "VacancyService",
+    "Method": "publishRealtimeNotification(Ljava/lang/Long;Ljava/lang/String;Ljava/util/Map;)V",
+    "MissedLines": [],
+    "MissedBranchLines": [
+      796
+    ]
+  }
+]

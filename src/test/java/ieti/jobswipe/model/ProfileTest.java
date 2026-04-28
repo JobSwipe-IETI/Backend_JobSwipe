@@ -2,6 +2,8 @@ package ieti.jobswipe.model;
 
 import org.junit.jupiter.api.Test;
 
+import ieti.jobswipe.model.entity.Profile;
+import ieti.jobswipe.model.entity.User;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

@@ -2,7 +2,10 @@ package ieti.jobswipe.security;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -22,6 +25,8 @@ public class GoogleIdentityTokenVerifier implements IdentityTokenVerifier {
             "accounts.google.com");
 
     private final GoogleIdTokenVerifier verifier;
+    private final Map<String, CachedAuthResult> tokenCache = new ConcurrentHashMap<>();
+    private static final long TOKEN_CACHE_TTL_SECONDS = 120;
 
     public GoogleIdentityTokenVerifier(GoogleOAuthProperties googleOAuthProperties) {
         this.verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance())
@@ -32,6 +37,11 @@ public class GoogleIdentityTokenVerifier implements IdentityTokenVerifier {
 
     @Override
     public AuthenticatedUser verify(String token) {
+        CachedAuthResult cached = tokenCache.get(token);
+        if (cached != null && cached.expiresAt().isAfter(Instant.now())) {
+            return cached.authenticatedUser();
+        }
+
         try {
             GoogleIdToken idToken = verifier.verify(token);
             if (idToken == null) {
@@ -43,14 +53,27 @@ public class GoogleIdentityTokenVerifier implements IdentityTokenVerifier {
                 throw new InvalidIdentityTokenException("Google identity token does not contain email");
             }
 
-            return new AuthenticatedUser(
+            AuthenticatedUser authenticatedUser = new AuthenticatedUser(
                     payload.getSubject(),
                     payload.getEmail(),
                     payload.get("name") != null ? payload.get("name").toString() : null,
                     payload.get("picture") != null ? payload.get("picture").toString() : null);
+
+            tokenCache.put(token, new CachedAuthResult(
+                    authenticatedUser,
+                    Instant.now().plusSeconds(TOKEN_CACHE_TTL_SECONDS)));
+
+            if (tokenCache.size() > 2048) {
+                tokenCache.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(Instant.now()));
+            }
+
+            return authenticatedUser;
         } catch (GeneralSecurityException | IOException exception) {
             throw new InvalidIdentityTokenException("Invalid Google identity token", exception);
         }
+    }
+
+    private record CachedAuthResult(AuthenticatedUser authenticatedUser, Instant expiresAt) {
     }
 }
 
