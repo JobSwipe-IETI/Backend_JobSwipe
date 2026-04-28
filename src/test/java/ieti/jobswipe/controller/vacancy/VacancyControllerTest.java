@@ -10,10 +10,32 @@ import ieti.jobswipe.dto.vacancy.CreateVacancyRequest;
 import ieti.jobswipe.dto.vacancy.VacancyApplicantResponse;
 import ieti.jobswipe.dto.vacancy.VacancyDetailResponse;
 import ieti.jobswipe.dto.vacancy.VacancyRecommendationResponse;
-import ieti.jobswipe.dto.vacancy.VacancySummaryResponse;er;
+import ieti.jobswipe.dto.vacancy.VacancySummaryResponse;
 import ieti.jobswipe.service.recommendation.RecommendationJobService;
 import ieti.jobswipe.service.vacancy.VacancyService;
-import org.junit.jupiter.api.BeforeEachorg.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.oauth2.jwt.Jwt;
+
+import ieti.jobswipe.model.entity.User;
+import ieti.jobswipe.model.Role;
+import ieti.jobswipe.model.SwipeDecisionType;
+import java.time.Instant;
+import java.util.Map;
+import java.util.Optional;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+
+import java.util.Arrays;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+@ExtendWith(MockitoExtension.class)
 class VacancyControllerTest {
 
     @Mock
