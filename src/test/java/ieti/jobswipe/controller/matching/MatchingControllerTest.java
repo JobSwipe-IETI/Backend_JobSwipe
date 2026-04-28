@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ieti.jobswipe.dto.matching.MatchingRequest;
 import ieti.jobswipe.dto.matching.MatchingResponse;
-import ieti.jobswipe.controller.matching.MatchingController;
 import ieti.jobswipe.service.matching.MatchingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,7 +16,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.hamcrest.Matchers.is;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -70,7 +68,7 @@ class MatchingControllerTest {
                 .andExpect(jsonPath("$.feedback", is("Great fit")))
                 .andExpect(jsonPath("$.usedLlmFeedback", is(true)));
 
-        verify(matchingService, times(1)).calculateMatch(eq(1L), eq(10L));
+        verify(matchingService, times(1)).calculateMatch(1L, 10L);
     }
 
     @Test
@@ -87,7 +85,7 @@ class MatchingControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
 
-        verify(matchingService, times(1)).calculateMatch(eq(1L), eq(999L));
+        verify(matchingService, times(1)).calculateMatch(1L, 999L);
     }
 
     @Test
@@ -104,7 +102,7 @@ class MatchingControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isServiceUnavailable());
 
-        verify(matchingService, times(1)).calculateMatch(eq(1L), eq(10L));
+        verify(matchingService, times(1)).calculateMatch(1L, 10L);
     }
 
     @Test

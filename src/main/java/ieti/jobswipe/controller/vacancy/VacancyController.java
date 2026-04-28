@@ -44,6 +44,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class VacancyController {
 
     private static final String MESSAGE_KEY = "message";
+    private static final String JOB_ID_KEY = "jobId";
 
     private final VacancyService vacancyService;
     private final RecommendationJobService recommendationJobService;
@@ -151,19 +152,16 @@ public class VacancyController {
                 return ResponseEntity.badRequest().build();
             }
 
+            CompanyCandidateDecisionRequest resolvedRequest = request != null
+                    ? request
+                    : CompanyCandidateDecisionRequest.builder().build();
+            resolvedRequest.setDecision(resolvedDecision);
+
             CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
                     companyId,
                     vacancyId,
                     candidateId,
-                    resolvedDecision,
-                    request != null ? request.getRejectionReason() : null,
-                    request != null ? request.getRejectionTags() : null,
-                    request != null ? request.getMissingTechnologies() : null,
-                        request != null ? request.getMissingResponsibilities() : null,
-                        request != null ? request.getMissingTechnicalRequirements() : null,
-                        request != null ? request.getExpectedExperienceLevel() : null,
-                        request != null ? request.getAiSummary() : null,
-                    request != null ? request.getRejectionComment() : null);
+                    resolvedRequest);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().build();
@@ -241,7 +239,7 @@ public class VacancyController {
 
         Long userId = Long.parseLong(jwt.getSubject());
         String jobId = recommendationJobService.startJob(userId, minScore, limit);
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("jobId", jobId));
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(JOB_ID_KEY, jobId));
     }
 
     @GetMapping("/recommended/jobs/{jobId}")
@@ -257,12 +255,12 @@ public class VacancyController {
 
         RecommendationJobService.RecommendationJob job = jobOpt.get();
         return ResponseEntity.ok(Map.of(
-                "jobId", job.getJobId(),
+            JOB_ID_KEY, job.getJobId(),
                 "status", job.getStatus().name(),
                 "processed", job.getProcessed(),
                 "total", job.getTotal(),
                 "progressPercent", job.getProgressPercent(),
-                "message", job.getMessage() != null ? job.getMessage() : "",
+                MESSAGE_KEY, job.getMessage() != null ? job.getMessage() : "",
                 "error", job.getError() != null ? job.getError() : "",
                 "startedAt", job.getStartedAt().toString()));
     }
@@ -314,12 +312,12 @@ public class VacancyController {
         List<VacancyRecommendationResponse> items = all.subList(safeOffset, end);
 
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("jobId", job.getJobId());
+        response.put(JOB_ID_KEY, job.getJobId());
         response.put("status", job.getStatus().name());
         response.put("processed", job.getProcessed());
         response.put("total", job.getTotal());
         response.put("progressPercent", job.getProgressPercent());
-        response.put("message", job.getMessage() != null ? job.getMessage() : "");
+        response.put(MESSAGE_KEY, job.getMessage() != null ? job.getMessage() : "");
         response.put("error", job.getError() != null ? job.getError() : "");
         response.put("done", job.getStatus() != RecommendationJobService.JobStatus.RUNNING);
         response.put("offset", safeOffset);

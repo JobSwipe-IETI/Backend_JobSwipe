@@ -337,7 +337,7 @@ class UserProvisioningServiceTest {
         }
 
         @Test
-        void shouldCacheByNormalizedEmailWhenGoogleIdIsBlank() throws Exception {
+        void shouldCacheByNormalizedEmailWhenGoogleIdIsBlank() {
         AuthenticatedUser userWithoutGoogleId = new AuthenticatedUser(
             " ",
             "  MIXED@Example.com  ",

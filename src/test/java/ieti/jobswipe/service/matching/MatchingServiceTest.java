@@ -9,7 +9,7 @@ import ieti.jobswipe.model.entity.Profile;
 import ieti.jobswipe.model.entity.Vacancy;
 import ieti.jobswipe.repository.profile.ProfileRepository;
 import ieti.jobswipe.repository.vacancy.VacancyRepository;
-        import ieti.jobswipe.service.matching.MatchingService;
+       
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -198,8 +198,8 @@ class MatchingServiceTest {
         RuntimeException exception = assertThrows(RuntimeException.class,
                 () -> matchingService.calculateMatch(1L, 10L));
 
-        assertTrue(exception.getMessage().contains("Failed to calculate matching"));
-        assertTrue(exception.getMessage().contains("AI service returned null response"));
+        assertTrue(exception.getMessage().contains("Error calling AI service"));
+        assertTrue(exception.getCause().getMessage().contains("AI service returned null response"));
     }
 
     @Test

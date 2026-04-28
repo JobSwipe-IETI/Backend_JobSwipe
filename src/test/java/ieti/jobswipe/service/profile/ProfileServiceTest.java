@@ -15,7 +15,7 @@ import ieti.jobswipe.repository.profile.CandidateProfileRepository;
 import ieti.jobswipe.repository.company.CompanyProfileRepository;
 import ieti.jobswipe.repository.profile.ProfileRepository;
 import ieti.jobswipe.repository.user.UserRepository;
-    import ieti.jobswipe.service.profile.ProfileService;
+    
 
 
 import org.junit.jupiter.api.BeforeEach;

@@ -2,9 +2,11 @@ package ieti.jobswipe.service.storage;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
-    import ieti.jobswipe.service.storage.DocumentStorageService;
+    
 
 
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -34,7 +36,7 @@ class DocumentStorageServiceTest {
     Path tempDir;
 
     @Test
-    void shouldStoreDocumentLocally() throws Exception {
+    void shouldStoreDocumentLocally() {
         DocumentStorageService service = new DocumentStorageService(
                 "local",
                 tempDir.toString(),
@@ -264,38 +266,26 @@ class DocumentStorageServiceTest {
         assertEquals("pdf", extension);
     }
 
-    @Test
-    void shouldBuildS3SchemePathWhenPublicBaseUrlIsMissing() throws Exception {
+    @ParameterizedTest
+    @CsvSource({
+        "'', s3://bucket-name/jobswipe/uploads/file.pdf",
+        "https://cdn.example.com, https://cdn.example.com/jobswipe/uploads/file.pdf",
+        "https://cdn.example.com/, https://cdn.example.com/jobswipe/uploads/file.pdf"
+    })
+    void shouldBuildS3StoragePathForDifferentPublicBaseUrls(String publicBaseUrl, String expectedPath) throws Exception {
         DocumentStorageService service = new DocumentStorageService(
                 "s3",
                 tempDir.toString(),
                 "bucket-name",
                 "us-east-1",
                 "jobswipe/uploads",
-                "");
+                publicBaseUrl);
 
         Method buildS3StoragePath = DocumentStorageService.class.getDeclaredMethod("buildS3StoragePath", String.class);
         buildS3StoragePath.setAccessible(true);
         String storagePath = (String) buildS3StoragePath.invoke(service, "jobswipe/uploads/file.pdf");
 
-        assertEquals("s3://bucket-name/jobswipe/uploads/file.pdf", storagePath);
-    }
-
-    @Test
-    void shouldBuildS3HttpPathWhenPublicBaseUrlHasNoTrailingSlash() throws Exception {
-        DocumentStorageService service = new DocumentStorageService(
-                "s3",
-                tempDir.toString(),
-                "bucket-name",
-                "us-east-1",
-                "jobswipe/uploads",
-                "https://cdn.example.com");
-
-        Method buildS3StoragePath = DocumentStorageService.class.getDeclaredMethod("buildS3StoragePath", String.class);
-        buildS3StoragePath.setAccessible(true);
-        String storagePath = (String) buildS3StoragePath.invoke(service, "jobswipe/uploads/file.pdf");
-
-        assertEquals("https://cdn.example.com/jobswipe/uploads/file.pdf", storagePath);
+        assertEquals(expectedPath, storagePath);
     }
 
     @Test

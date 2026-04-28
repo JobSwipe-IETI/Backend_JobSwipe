@@ -12,6 +12,8 @@ import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpEntity;
@@ -66,30 +68,11 @@ class SupabaseChatRealtimePublisherTest {
         verify(restTemplate, never()).postForEntity(any(String.class), any(HttpEntity.class), eq(Void.class));
     }
 
-    @Test
-    void shouldNotPublishWhenConfigurationMissing() {
-        ReflectionTestUtils.setField(publisher, "supabaseServiceRoleKey", " ");
+    @ParameterizedTest
+    @ValueSource(strings = { "supabaseServiceRoleKey", "supabaseUrl", "realtimeMessagesTable" })
+    void shouldNotPublishWhenRequiredConfigurationFieldIsBlank(String fieldName) {
+        ReflectionTestUtils.setField(publisher, fieldName, " ");
         ChatMessageResponse message = ChatMessageResponse.builder().id(9L).build();
-
-        publisher.publishMessage(message);
-
-        verify(restTemplate, never()).postForEntity(any(String.class), any(HttpEntity.class), eq(Void.class));
-    }
-
-    @Test
-    void shouldNotPublishWhenUrlIsBlank() {
-        ReflectionTestUtils.setField(publisher, "supabaseUrl", " ");
-        ChatMessageResponse message = ChatMessageResponse.builder().id(13L).build();
-
-        publisher.publishMessage(message);
-
-        verify(restTemplate, never()).postForEntity(any(String.class), any(HttpEntity.class), eq(Void.class));
-    }
-
-    @Test
-    void shouldNotPublishWhenMessagesTableIsBlank() {
-        ReflectionTestUtils.setField(publisher, "realtimeMessagesTable", " ");
-        ChatMessageResponse message = ChatMessageResponse.builder().id(14L).build();
 
         publisher.publishMessage(message);
 

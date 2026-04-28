@@ -1,8 +1,6 @@
 package ieti.jobswipe.controller.chat;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -152,7 +150,7 @@ class ChatControllerTest {
     @Test
     void shouldReturnBadRequestWhenSendMessageInvalid() {
         ChatMessageRequest request = ChatMessageRequest.builder().content("hello").build();
-        when(chatService.sendMessage(eq(10L), eq(8L), eq("hello"), eq(null)))
+        when(chatService.sendMessage(10L, 8L, "hello", null))
                 .thenThrow(new IllegalArgumentException("bad"));
 
         ResponseEntity<ChatMessageResponse> response = chatController.sendMessage(jwt, 8L, request);
@@ -163,7 +161,7 @@ class ChatControllerTest {
     @Test
     void shouldReturnNotFoundWhenSendMessageRuntime() {
         ChatMessageRequest request = ChatMessageRequest.builder().content("hello").build();
-        when(chatService.sendMessage(eq(10L), eq(8L), eq("hello"), eq(null)))
+        when(chatService.sendMessage(10L, 8L, "hello", null))
                 .thenThrow(new RuntimeException("missing"));
 
         ResponseEntity<ChatMessageResponse> response = chatController.sendMessage(jwt, 8L, request);
@@ -181,7 +179,7 @@ class ChatControllerTest {
 
     @Test
     void shouldMarkAsReadNotFoundWhenServiceFails() {
-        org.mockito.Mockito.doThrow(new RuntimeException("x")).when(chatService).markConversationAsRead(anyLong(), eq(50L));
+        org.mockito.Mockito.doThrow(new RuntimeException("x")).when(chatService).markConversationAsRead(10L, 50L);
 
         ResponseEntity<Void> response = chatController.markAsRead(jwt, 50L);
 

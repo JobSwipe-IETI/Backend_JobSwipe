@@ -356,14 +356,16 @@ class VacancyControllerTest {
 
             @Test
             void shouldThrowWhenStartRecommendationJobMinScoreIsNull() {
+            var candidateJwt = jwt("1", "CANDIDATE");
             assertThrows(NullPointerException.class,
-                () -> vacancyController.startRecommendedVacanciesJob(jwt("1", "CANDIDATE"), null, 10));
+                () -> vacancyController.startRecommendedVacanciesJob(candidateJwt, null, 10));
             }
 
             @Test
             void shouldThrowWhenStartRecommendationJobLimitIsNull() {
+            var candidateJwt = jwt("1", "CANDIDATE");
             assertThrows(NullPointerException.class,
-                () -> vacancyController.startRecommendedVacanciesJob(jwt("1", "CANDIDATE"), 10.0f, null));
+                () -> vacancyController.startRecommendedVacanciesJob(candidateJwt, 10.0f, null));
             }
 
         @Test
@@ -831,15 +833,7 @@ class VacancyControllerTest {
             1L,
             3L,
             2L,
-            SwipeDecisionType.DISLIKE,
-            "Skills gap",
-            List.of("backend"),
-            List.of("Spring"),
-            List.of("Mentoring"),
-            List.of("System design"),
-            "SENIOR",
-            "Candidate lacks required scope",
-            "Not enough architecture depth")).thenReturn(payload);
+            request)).thenReturn(payload);
 
         ResponseEntity<CompanyCandidateDecisionResponse> response = vacancyController.registerCompanyCandidateDecision(
             jwt("1", "COMPANY"),
@@ -872,15 +866,7 @@ class VacancyControllerTest {
             1L,
             3L,
             2L,
-            SwipeDecisionType.LIKE,
-            "unused",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null)).thenReturn(payload);
+            request)).thenReturn(payload);
 
         ResponseEntity<CompanyCandidateDecisionResponse> response = vacancyController.registerCompanyCandidateDecision(
             jwt("1", "COMPANY"),
@@ -904,25 +890,21 @@ class VacancyControllerTest {
             .matched(false)
             .build();
 
+        CompanyCandidateDecisionRequest request = CompanyCandidateDecisionRequest.builder()
+            .decision(SwipeDecisionType.LIKE)
+            .build();
+
         when(vacancyService.registerCompanyCandidateDecision(
             1L,
             3L,
             2L,
-            SwipeDecisionType.LIKE,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null)).thenReturn(payload);
+            request)).thenReturn(payload);
 
         ResponseEntity<CompanyCandidateDecisionResponse> response = vacancyController.registerCompanyCandidateDecision(
             jwt("1", "COMPANY"),
             3L,
             2L,
-            null,
+            request,
             SwipeDecisionType.LIKE);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -941,7 +923,7 @@ class VacancyControllerTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         verify(vacancyService, times(0)).registerCompanyCandidateDecision(
-            anyLong(), anyLong(), anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+            anyLong(), anyLong(), anyLong(), any(CompanyCandidateDecisionRequest.class));
         }
 
         @Test
@@ -953,15 +935,7 @@ class VacancyControllerTest {
             1L,
             3L,
             2L,
-            SwipeDecisionType.LIKE,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null)).thenThrow(new IllegalArgumentException("invalid"));
+            request)).thenThrow(new IllegalArgumentException("invalid"));
 
         ResponseEntity<CompanyCandidateDecisionResponse> response = vacancyController.registerCompanyCandidateDecision(
             jwt("1", "COMPANY"),
@@ -982,15 +956,7 @@ class VacancyControllerTest {
             1L,
             3L,
             2L,
-            SwipeDecisionType.LIKE,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null)).thenThrow(new RuntimeException("missing"));
+            request)).thenThrow(new RuntimeException("missing"));
 
         ResponseEntity<CompanyCandidateDecisionResponse> response = vacancyController.registerCompanyCandidateDecision(
             jwt("1", "COMPANY"),

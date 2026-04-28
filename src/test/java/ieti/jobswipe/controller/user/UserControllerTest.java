@@ -3,7 +3,6 @@ package ieti.jobswipe.controller.user;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ieti.jobswipe.dto.user.UserRequest;
-import ieti.jobswipe.controller.user.UserController;
 import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.entity.User;
 import ieti.jobswipe.service.user.UserService;

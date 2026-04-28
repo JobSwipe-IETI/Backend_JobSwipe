@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
 import org.mockito.InjectMocks;
@@ -25,7 +28,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ieti.jobswipe.controller.auth.AuthController;
 import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.entity.User;
 import ieti.jobswipe.repository.profile.ProfileRepository;
@@ -117,30 +119,11 @@ class AuthControllerTest {
                 verify(profileRepository, times(1)).existsByUserId(1L);
         }
 
-        @Test
-        void shouldThrowBadRequestWhenIdTokenIsNull() throws Exception {
-                AuthController.GoogleAuthRequest request = new AuthController.GoogleAuthRequest(null, null);
-
-                mockMvc.perform(post("/api/auth/google")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
-                                .andExpect(status().isBadRequest());
-        }
-
-        @Test
-        void shouldThrowBadRequestWhenIdTokenIsEmpty() throws Exception {
-                AuthController.GoogleAuthRequest request = new AuthController.GoogleAuthRequest("", null);
-
-                mockMvc.perform(post("/api/auth/google")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
-                                .andExpect(status().isBadRequest());
-        }
-
-        @Test
-        void shouldThrowBadRequestWhenIdTokenIsBlank() throws Exception {
-                AuthController.GoogleAuthRequest request = new AuthController.GoogleAuthRequest("   ", null);
-
+        @ParameterizedTest
+        @NullAndEmptySource
+        @ValueSource(strings = {"   "})
+        void shouldThrowBadRequestWhenIdTokenIsInvalid(String idToken) throws Exception {
+                AuthController.GoogleAuthRequest request = new AuthController.GoogleAuthRequest(idToken, null);
                 mockMvc.perform(post("/api/auth/google")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -149,11 +132,13 @@ class AuthControllerTest {
 
         @Test
         void shouldThrowBadRequestWhenGoogleRequestIsNull() {
-                ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-                                () -> authController.authenticateWithGoogle(null));
-
-                assertEquals(400, exception.getStatusCode().value());
-                assertEquals("400 BAD_REQUEST \"Google idToken is required\"", exception.getMessage());
+                                ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                                                () -> {
+                                                        // Only one invocation in lambda as per SonarQube
+                                                        authController.authenticateWithGoogle(null);
+                                                });
+                                assertEquals(400, exception.getStatusCode().value());
+                                assertEquals("400 BAD_REQUEST \"Google idToken is required\"", exception.getMessage());
         }
 
         @Test

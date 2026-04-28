@@ -1,6 +1,6 @@
 package ieti.jobswipe.controller.health;
 
-import ieti.jobswipe.controller.health.HealthController;
+
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

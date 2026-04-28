@@ -82,7 +82,8 @@ public class MatchingService {
         appendIfPresent(sb, "Location", profile.getLocation());
         appendCandidateDetails(sb, profile);
 
-        return sb.toString().isEmpty() ? "No candidate information available" : sb.toString();
+        String candidateStr = sb.toString();
+        return candidateStr.isEmpty() ? "No candidate information available" : candidateStr;
     }
 
     private void appendCandidateDetails(StringBuilder sb, Profile profile) {
@@ -131,13 +132,14 @@ public class MatchingService {
         if (vacancy.getSector() != null) {
             sb.append("Sector: ").append(vacancy.getSector()).append("\n");
         }
-        return sb.toString().isEmpty() ? "No vacancy information available" : sb.toString();
+        String vacancyStr = sb.toString();
+        return vacancyStr.isEmpty() ? "No vacancy information available" : vacancyStr;
     }
 
     private MatchingResponse callAiService(String candidateText, String vacancyText) {
         try {
             String url = aiServiceBaseUrl + "/embeddings/match";
-            logger.info("📡 Calling AI service: {}", url);
+            logger.info("\ud83d\udce1 Calling AI service: {}", url);
 
             // Build request payload
             Map<String, String> payload = new HashMap<>();
@@ -153,25 +155,26 @@ public class MatchingService {
             Map<String, Object> aiResponse = restTemplate.postForObject(url, request, Map.class);
 
             if (aiResponse == null) {
-                logger.error("❌ AI service returned null response");
-                throw new RuntimeException("AI service returned null response");
+                logger.error("\u274c AI service returned null response");
+                throw new IllegalStateException("AI service returned null response");
             }
 
-            logger.info("✅ AI service response: {}", aiResponse);
+            logger.info("\u2705 AI service response: {}", aiResponse);
 
-            // Parse response
-            MatchingResponse response = MatchingResponse.builder()
+            // Parse response and return directly
+            return MatchingResponse.builder()
                     .similarityScore(((Number) aiResponse.get("similarity_score")).doubleValue())
                     .compatibilityPercentage(((Number) aiResponse.get("compatibility_percentage")).floatValue())
                     .compatibilityLevel((String) aiResponse.get("compatibility_level"))
                     .feedback((String) aiResponse.get("feedback"))
                     .usedLlmFeedback((Boolean) aiResponse.get("used_llm_feedback"))
                     .build();
-
-            return response;
+        } catch (IllegalStateException e) {
+            String contextMsg = "Error calling AI service: " + e.getMessage();
+            throw new IllegalStateException(contextMsg, e);
         } catch (Exception e) {
-            logger.error("❌ Error calling AI service: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to calculate matching: " + e.getMessage(), e);
+            logger.error("\u274c Error calling AI service: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to calculate matching: " + e.getMessage(), e);
         }
     }
 }

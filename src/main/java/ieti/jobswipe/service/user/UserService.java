@@ -1,20 +1,26 @@
 package ieti.jobswipe.service.user;
 
+import java.util.List;
+
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import ieti.jobswipe.exception.ErrorMessages;
+import ieti.jobswipe.exception.UserNotFoundException;
 import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.entity.User;
 import ieti.jobswipe.repository.user.UserRepository;
-import ieti.jobswipe.exception.ErrorMessages;
-import ieti.jobswipe.exception.UserNotFoundException;
-
-import java.util.List;
 
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
+
+    // Self-injection for transactional proxy
+    
+    @Lazy
+    private UserService self;
 
     public UserService(UserRepository userRepository) {
         this.userRepository = userRepository;
@@ -50,7 +56,7 @@ public class UserService {
     }
 
     public User updateUserRole(Long userId, Role role) {
-        User user = getUserById(userId);
+        User user = self != null ? self.getUserById(userId) : getUserById(userId);
         user.setRole(role);
         return userRepository.save(user);
     }

@@ -1,7 +1,7 @@
 package ieti.jobswipe.dto.company;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -40,8 +40,8 @@ public class CompanyProfileRequest {
         @Size(max = 80, message = "El pais/nacionalidad no puede superar 80 caracteres")
         private String nationality;
 
-    @Pattern(
-            regexp = "^$|^(?:\\+?\\d{1,3}[\\s-]?)?(?:\\(?\\d{2,4}\\)?[\\s-]?)?\\d{3,4}[\\s-]?\\d{3,4}$",
+        @Pattern(
+            regexp = "^$|^(\\+\\d{1,3}[\\s-]?)?\\d{6,15}$",
             message = "Telefono invalido")
     private String phoneNumber;
 

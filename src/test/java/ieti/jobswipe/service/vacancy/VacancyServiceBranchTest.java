@@ -7,8 +7,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Method;
-import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import ieti.jobswipe.dto.company.CompanyCandidateDecisionRequest;
 import ieti.jobswipe.model.SwipeDecisionType;
 import ieti.jobswipe.model.entity.User;
 import ieti.jobswipe.model.entity.Vacancy;
@@ -27,8 +26,6 @@ import ieti.jobswipe.repository.company.CompanyCandidateDecisionRepository;
 import ieti.jobswipe.repository.profile.ProfileRepository;
 import ieti.jobswipe.repository.user.UserRepository;
 import ieti.jobswipe.repository.vacancy.VacancyRepository;
-import ieti.jobswipe.repository.vacancy.VacancySwipeRepository;
-import ieti.jobswipe.repository.vacancy.VacancySwipeRepository;
 import ieti.jobswipe.repository.vacancy.VacancySwipeRepository;
 import ieti.jobswipe.service.chat.ChatRealtimeService;
 import ieti.jobswipe.service.matching.MatchingService;
@@ -126,15 +123,9 @@ class VacancyServiceBranchTest {
             7L,
             20L,
             3L,
-            SwipeDecisionType.LIKE,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null);
+            CompanyCandidateDecisionRequest.builder()
+                .decision(SwipeDecisionType.LIKE)
+                .build());
 
         // Expect notification for company_decision + two match notifications
         verify(chatRealtimeService, times(3)).publishToUser(anyLong(), org.mockito.ArgumentMatchers.any());

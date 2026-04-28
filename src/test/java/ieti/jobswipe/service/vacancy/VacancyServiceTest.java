@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -25,6 +26,7 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.Cache;
@@ -32,6 +34,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import ieti.jobswipe.dto.company.CompanyCandidateDecisionResponse;
+import ieti.jobswipe.dto.company.CompanyCandidateDecisionRequest;
 import ieti.jobswipe.dto.matching.MatchingResponse;
 import ieti.jobswipe.dto.matching.UserMatchResponse;
 import ieti.jobswipe.dto.user.CandidateApplicationResponse;
@@ -78,7 +81,7 @@ class VacancyServiceTest {
 
                 ReflectionTestUtils.setField(vacancyService, "chatRealtimeService", chatRealtimeService);
 
-                CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
+                CompanyCandidateDecisionResponse response = registerCompanyCandidateDecision(
                     100L, 300L, 200L, SwipeDecisionType.DISLIKE, "Motivo", List.of("tag"), List.of("java"), List.of("resp"), List.of("req"), "SENIOR", "summary", "comment");
 
                 // Verifica que el fallback se use en la notificación
@@ -119,8 +122,8 @@ class VacancyServiceTest {
                 when(companyCandidateDecisionRepository.existsByCompanyIdAndCandidateIdAndVacancyIdAndDecision(2L, 1L, 3L, SwipeDecisionType.LIKE)).thenReturn(false);
                 when(userRepository.findById(1L)).thenReturn(Optional.of(candidate));
 
-                // No debe lanzar excepción aunque el cacheManager sea null
-                nullCacheManagerService.registerSwipeDecision(1L, 3L, SwipeDecisionType.LIKE);
+                assertDoesNotThrow(() -> nullCacheManagerService.registerSwipeDecision(1L, 3L, SwipeDecisionType.LIKE));
+                verify(vacancySwipeRepository).save(any(VacancySwipe.class));
             }
         @Test
         void shouldSkipEvictCacheKeyWhenCacheManagerIsNull_explicit() {
@@ -133,8 +136,8 @@ class VacancyServiceTest {
                     vacancySwipeRepository,
                     companyCandidateDecisionRepository,
                     null);
-            // Should not throw or attempt to evict
-            ReflectionTestUtils.invokeMethod(nullCacheManagerService, "evictCacheKey", "vacanciesForUser", 42L);
+            assertDoesNotThrow(() ->
+                    ReflectionTestUtils.invokeMethod(nullCacheManagerService, "evictCacheKey", "vacanciesForUser", 42L));
         }
 
         @Test
@@ -261,6 +264,33 @@ class VacancyServiceTest {
         ReflectionTestUtils.setField(vacancyService, "chatRealtimeService", null);
     }
 
+    private CompanyCandidateDecisionResponse registerCompanyCandidateDecision(
+            Long companyId,
+            Long vacancyId,
+            Long candidateId,
+            SwipeDecisionType decision,
+            String rejectionReason,
+            List<String> rejectionTags,
+            List<String> missingTechnologies,
+            List<String> missingResponsibilities,
+            List<String> missingTechnicalRequirements,
+            String expectedExperienceLevel,
+            String aiSummary,
+            String rejectionComment) {
+        CompanyCandidateDecisionRequest request = CompanyCandidateDecisionRequest.builder()
+                .decision(decision)
+                .rejectionReason(rejectionReason)
+                .rejectionTags(rejectionTags)
+                .missingTechnologies(missingTechnologies)
+                .missingResponsibilities(missingResponsibilities)
+                .missingTechnicalRequirements(missingTechnicalRequirements)
+                .expectedExperienceLevel(expectedExperienceLevel)
+                .aiSummary(aiSummary)
+                .rejectionComment(rejectionComment)
+                .build();
+        return vacancyService.registerCompanyCandidateDecision(companyId, vacancyId, candidateId, request);
+    }
+
     @Test
     void shouldReturnVacancySummariesForCompanyUser() {
         User companyUser = User.builder().id(1L).role(Role.COMPANY).build();
@@ -383,7 +413,8 @@ class VacancyServiceTest {
 
     @Test
     void shouldSkipEvictCacheKeyWhenKeyIsNull() {
-        ReflectionTestUtils.invokeMethod(vacancyService, "evictCacheKey", "vacanciesForUser", new Object[] { null });
+        assertDoesNotThrow(() ->
+                ReflectionTestUtils.invokeMethod(vacancyService, "evictCacheKey", "vacanciesForUser", new Object[] { null }));
     }
 
     @Test
@@ -397,8 +428,8 @@ class VacancyServiceTest {
                 vacancySwipeRepository,
                 companyCandidateDecisionRepository,
                 null);
-
-        ReflectionTestUtils.invokeMethod(nullCacheManagerService, "evictCacheKey", "vacanciesForUser", 123L);
+        assertDoesNotThrow(() ->
+                ReflectionTestUtils.invokeMethod(nullCacheManagerService, "evictCacheKey", "vacanciesForUser", 123L));
     }
 
     @Test
@@ -416,7 +447,7 @@ class VacancyServiceTest {
             .thenReturn(false);
         when(recommendationCacheRepository.findByUserIdAndVacancyId(200L, 30L)).thenReturn(Optional.empty());
 
-        CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
+        CompanyCandidateDecisionResponse response = registerCompanyCandidateDecision(
             9L,
             30L,
             200L,
@@ -436,12 +467,15 @@ class VacancyServiceTest {
 
     @Test
     void shouldSkipRealtimeNotificationWhenServiceOrTypeIsMissing() {
-        ReflectionTestUtils.setField(vacancyService, "chatRealtimeService", null);
-        ReflectionTestUtils.invokeMethod(vacancyService, "publishRealtimeNotification", 1L, "notification.test", java.util.Map.of("x", 1));
+        assertDoesNotThrow(() -> {
+            ReflectionTestUtils.setField(vacancyService, "chatRealtimeService", null);
+            ReflectionTestUtils.invokeMethod(vacancyService, "publishRealtimeNotification", 1L, "notification.test", java.util.Map.of("x", 1));
 
-        ReflectionTestUtils.setField(vacancyService, "chatRealtimeService", chatRealtimeService);
-        ReflectionTestUtils.invokeMethod(vacancyService, "publishRealtimeNotification", null, "notification.test", java.util.Map.of("x", 1));
-        ReflectionTestUtils.invokeMethod(vacancyService, "publishRealtimeNotification", 1L, " ", java.util.Map.of("x", 1));
+            ReflectionTestUtils.setField(vacancyService, "chatRealtimeService", chatRealtimeService);
+            ReflectionTestUtils.invokeMethod(vacancyService, "publishRealtimeNotification", null, "notification.test", java.util.Map.of("x", 1));
+            ReflectionTestUtils.invokeMethod(vacancyService, "publishRealtimeNotification", 1L, " ", java.util.Map.of("x", 1));
+        });
+        verifyNoInteractions(chatRealtimeService);
     }
 
     @Test
@@ -774,7 +808,7 @@ class VacancyServiceTest {
         Vacancy second = Vacancy.builder().id(2L).title("Second").company(testCompany).build();
 
         when(vacancyRepository.findAllByCompanyId(1L)).thenReturn(List.of(first, second));
-        when(vacancySwipeRepository.countPendingLikesByVacancyIds(eq(1L), eq(List.of(1L, 2L))))
+        when(vacancySwipeRepository.countPendingLikesByVacancyIds(1L, List.of(1L, 2L)))
             .thenReturn(List.of(
                 new Object[] { 1L, 1L },
                 new Object[] { 2L, 3L }
@@ -1090,8 +1124,8 @@ class VacancyServiceTest {
         assertEquals(72.0f, recommendations.get(1).getCompatibilityPercentage());
         assertTrue(recommendations.stream().allMatch(item -> item.getCompatibilityPercentage() >= 70.0f));
         verify(vacancyRepository, times(1)).findAll();
-        verify(matchingService, times(1)).calculateMatch(eq(1L), eq(1L));
-        verify(matchingService, times(1)).calculateMatch(eq(1L), eq(2L));
+        verify(matchingService, times(1)).calculateMatch(1L, 1L);
+        verify(matchingService, times(1)).calculateMatch(1L, 2L);
         }
 
         @Test
@@ -1556,7 +1590,7 @@ class VacancyServiceTest {
         when(vacancySwipeRepository.existsByUserIdAndVacancyIdAndDecision(2L, 3L, SwipeDecisionType.LIKE))
             .thenReturn(true);
 
-        CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
+        CompanyCandidateDecisionResponse response = registerCompanyCandidateDecision(
             1L,
             3L,
             2L,
@@ -1591,7 +1625,7 @@ class VacancyServiceTest {
         when(vacancySwipeRepository.existsByUserIdAndVacancyIdAndDecision(2L, 3L, SwipeDecisionType.LIKE))
             .thenReturn(false);
 
-        CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
+        CompanyCandidateDecisionResponse response = registerCompanyCandidateDecision(
             1L,
             3L,
             2L,
@@ -1624,7 +1658,7 @@ class VacancyServiceTest {
         when(vacancySwipeRepository.existsByUserIdAndVacancyIdAndDecision(2L, 3L, SwipeDecisionType.LIKE))
             .thenReturn(false);
 
-        CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
+        CompanyCandidateDecisionResponse response = registerCompanyCandidateDecision(
             1L,
             3L,
             2L,
@@ -1662,7 +1696,7 @@ class VacancyServiceTest {
         when(vacancySwipeRepository.existsByUserIdAndVacancyIdAndDecision(2L, 3L, SwipeDecisionType.LIKE))
             .thenReturn(false);
 
-        CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
+        CompanyCandidateDecisionResponse response = registerCompanyCandidateDecision(
             1L,
             3L,
             2L,
@@ -1694,7 +1728,7 @@ class VacancyServiceTest {
         when(vacancySwipeRepository.existsByUserIdAndVacancyIdAndDecision(2L, 3L, SwipeDecisionType.LIKE))
             .thenReturn(false);
 
-        CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
+        CompanyCandidateDecisionResponse response = registerCompanyCandidateDecision(
             1L,
             3L,
             2L,
@@ -1733,7 +1767,7 @@ class VacancyServiceTest {
         when(vacancySwipeRepository.existsByUserIdAndVacancyIdAndDecision(2L, 3L, SwipeDecisionType.LIKE))
             .thenReturn(true);
 
-        CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
+        CompanyCandidateDecisionResponse response = registerCompanyCandidateDecision(
             1L,
             3L,
             2L,
@@ -1757,7 +1791,7 @@ class VacancyServiceTest {
         User notCompany = User.builder().id(1L).role(Role.CANDIDATE).build();
         when(userRepository.findById(1L)).thenReturn(Optional.of(notCompany));
 
-        assertThrows(IllegalArgumentException.class, () -> vacancyService.registerCompanyCandidateDecision(
+        assertThrows(IllegalArgumentException.class, () -> registerCompanyCandidateDecision(
             1L, 3L, 2L, SwipeDecisionType.LIKE, null, null, null, null, null, null, null, null));
         }
 
@@ -1765,7 +1799,7 @@ class VacancyServiceTest {
         void shouldThrowWhenCompanyDecisionCompanyUserNotFound() {
         when(userRepository.findById(1L)).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class, () -> vacancyService.registerCompanyCandidateDecision(
+        assertThrows(RuntimeException.class, () -> registerCompanyCandidateDecision(
             1L, 3L, 2L, SwipeDecisionType.LIKE, null, null, null, null, null, null, null, null));
         }
 
@@ -1776,7 +1810,7 @@ class VacancyServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(company));
         when(userRepository.findById(2L)).thenReturn(Optional.of(notCandidate));
 
-        assertThrows(IllegalArgumentException.class, () -> vacancyService.registerCompanyCandidateDecision(
+        assertThrows(IllegalArgumentException.class, () -> registerCompanyCandidateDecision(
             1L, 3L, 2L, SwipeDecisionType.LIKE, null, null, null, null, null, null, null, null));
         }
 
@@ -1786,7 +1820,7 @@ class VacancyServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(company));
         when(userRepository.findById(2L)).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class, () -> vacancyService.registerCompanyCandidateDecision(
+        assertThrows(RuntimeException.class, () -> registerCompanyCandidateDecision(
             1L, 3L, 2L, SwipeDecisionType.LIKE, null, null, null, null, null, null, null, null));
         }
 
@@ -1801,7 +1835,7 @@ class VacancyServiceTest {
         when(userRepository.findById(2L)).thenReturn(Optional.of(candidate));
         when(vacancyRepository.findById(3L)).thenReturn(Optional.of(vacancy));
 
-        assertThrows(RuntimeException.class, () -> vacancyService.registerCompanyCandidateDecision(
+        assertThrows(RuntimeException.class, () -> registerCompanyCandidateDecision(
             1L, 3L, 2L, SwipeDecisionType.LIKE, null, null, null, null, null, null, null, null));
         }
 
@@ -1815,7 +1849,7 @@ class VacancyServiceTest {
         when(userRepository.findById(2L)).thenReturn(Optional.of(candidate));
         when(vacancyRepository.findById(3L)).thenReturn(Optional.of(vacancy));
 
-        assertThrows(RuntimeException.class, () -> vacancyService.registerCompanyCandidateDecision(
+        assertThrows(RuntimeException.class, () -> registerCompanyCandidateDecision(
             1L, 3L, 2L, SwipeDecisionType.LIKE, null, null, null, null, null, null, null, null));
         }
 
@@ -1828,7 +1862,7 @@ class VacancyServiceTest {
         when(userRepository.findById(2L)).thenReturn(Optional.of(candidate));
         when(vacancyRepository.findById(3L)).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class, () -> vacancyService.registerCompanyCandidateDecision(
+        assertThrows(RuntimeException.class, () -> registerCompanyCandidateDecision(
             1L, 3L, 2L, SwipeDecisionType.LIKE, null, null, null, null, null, null, null, null));
         }
 
@@ -2028,7 +2062,7 @@ class VacancyServiceTest {
         List<Object[]> grouped = new ArrayList<>();
         grouped.add(new Object[] { 1L, 5L });
         when(vacancyRepository.findAllByCompanyId(1L)).thenReturn(List.of(first, second));
-        when(vacancySwipeRepository.countByVacancyIdsAndDecision(eq(List.of(1L, 2L)), eq(SwipeDecisionType.LIKE)))
+        when(vacancySwipeRepository.countByVacancyIdsAndDecision(List.of(1L, 2L), SwipeDecisionType.LIKE))
             .thenReturn(grouped);
 
         var pipeline = serviceWithoutDecisionRepo.getCompanyVacancyPipeline(1L);
@@ -2169,7 +2203,7 @@ class VacancyServiceTest {
         when(vacancySwipeRepository.existsByUserIdAndVacancyIdAndDecision(2L, 3L, SwipeDecisionType.LIKE))
             .thenReturn(false);
 
-        CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
+        CompanyCandidateDecisionResponse response = registerCompanyCandidateDecision(
             1L,
             3L,
             2L,
@@ -2203,7 +2237,7 @@ class VacancyServiceTest {
         when(vacancySwipeRepository.existsByUserIdAndVacancyIdAndDecision(2L, 3L, SwipeDecisionType.LIKE))
             .thenReturn(false);
 
-        CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
+        CompanyCandidateDecisionResponse response = registerCompanyCandidateDecision(
             1L,
             3L,
             2L,
@@ -2237,7 +2271,7 @@ class VacancyServiceTest {
         when(vacancySwipeRepository.existsByUserIdAndVacancyIdAndDecision(2L, 3L, SwipeDecisionType.LIKE))
             .thenReturn(false);
 
-        CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
+        CompanyCandidateDecisionResponse response = registerCompanyCandidateDecision(
             1L,
             3L,
             2L,
@@ -2406,7 +2440,7 @@ class VacancyServiceTest {
         when(vacancySwipeRepository.existsByUserIdAndVacancyIdAndDecision(2L, 3L, SwipeDecisionType.LIKE))
             .thenReturn(false);
 
-        CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
+        CompanyCandidateDecisionResponse response = registerCompanyCandidateDecision(
             1L,
             3L,
             2L,

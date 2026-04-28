@@ -44,9 +44,9 @@ public class CandidateProfileRequest {
     @Size(max = 80, message = "La nacionalidad no puede superar 80 caracteres")
     private String nationality;
 
-    @Pattern(
-        regexp = "^$|^(?:\\+?\\d{1,3}[\\s-]?)?(?:\\(?\\d{2,4}\\)?[\\s-]?)?\\d{3,4}[\\s-]?\\d{3,4}$",
-        message = "Telefono invalido")
+        @Pattern(
+            regexp = "^$|^(\\+\\d{1,3}[\\s-]?)?\\d{6,15}$",
+            message = "Telefono invalido")
     private String phoneNumber;
 
     @Size(max = 200, message = "Idiomas no puede superar 200 caracteres")

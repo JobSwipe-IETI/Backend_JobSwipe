@@ -1,21 +1,23 @@
 package ieti.jobswipe.config;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.stereotype.Component;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.HandlerMapping;
+
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Timer;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.stereotype.Component;
-import org.springframework.web.method.HandlerMethod;
-import org.springframework.web.servlet.HandlerInterceptor;
-import org.springframework.web.servlet.HandlerMapping;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Component
 public class ApiMetricsInterceptor implements HandlerInterceptor {
+    private static final String UNKNOWN = "unknown";
 
     private static final String SAMPLE_ATTRIBUTE = "jobswipe.api.timer.sample";
     private final MeterRegistry meterRegistry;
@@ -42,8 +44,8 @@ public class ApiMetricsInterceptor implements HandlerInterceptor {
         }
 
         String route = resolveRoute(request);
-        String controller = "unknown";
-        String handlerMethod = "unknown";
+        String controller = UNKNOWN;
+        String handlerMethod = UNKNOWN;
 
         if (handler instanceof HandlerMethod method) {
             controller = method.getBeanType().getSimpleName();
@@ -80,6 +82,6 @@ public class ApiMetricsInterceptor implements HandlerInterceptor {
         }
 
         String uri = request.getRequestURI();
-        return (uri == null || uri.isBlank()) ? "unknown" : uri;
+        return (uri == null || uri.isBlank()) ? UNKNOWN : uri;
     }
 }

@@ -13,7 +13,6 @@ import static org.mockito.Mockito.when;
 import ieti.jobswipe.dto.vacancy.VacancyRecommendationResponse;
 import java.util.List;
 import java.util.Optional;
-import ieti.jobswipe.service.recommendation.RecommendationJobService;
 import ieti.jobswipe.service.vacancy.VacancyService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;

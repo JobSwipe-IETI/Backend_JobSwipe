@@ -13,9 +13,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -29,6 +29,7 @@ import org.springframework.util.StringUtils;
 
 import ieti.jobswipe.dto.chat.ChatRealtimeEventResponse;
 import ieti.jobswipe.dto.company.CompanyCandidateDecisionResponse;
+import ieti.jobswipe.dto.company.CompanyCandidateDecisionRequest;
 import ieti.jobswipe.dto.company.CompanyLikeActivityResponse;
 import ieti.jobswipe.dto.company.CompanyVacancyPipelineResponse;
 import ieti.jobswipe.dto.matching.MatchingResponse;
@@ -41,21 +42,21 @@ import ieti.jobswipe.dto.vacancy.VacancyRecommendationResponse;
 import ieti.jobswipe.dto.vacancy.VacancySummaryResponse;
 import ieti.jobswipe.exception.ErrorMessages;
 import ieti.jobswipe.exception.VacancyNotFoundException;
-import ieti.jobswipe.model.entity.CompanyCandidateDecision;
 import ieti.jobswipe.model.EmploymentType;
 import ieti.jobswipe.model.ExperienceLevel;
 import ieti.jobswipe.model.Modality;
-import ieti.jobswipe.model.entity.RecommendationCache;
 import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.SwipeDecisionType;
+import ieti.jobswipe.model.entity.CompanyCandidateDecision;
+import ieti.jobswipe.model.entity.RecommendationCache;
 import ieti.jobswipe.model.entity.User;
 import ieti.jobswipe.model.entity.Vacancy;
 import ieti.jobswipe.model.entity.VacancySwipe;
-import ieti.jobswipe.repository.projection.CandidateApplicationProjection;
 import ieti.jobswipe.repository.company.CompanyCandidateDecisionRepository;
 import ieti.jobswipe.repository.profile.ProfileRepository;
-import ieti.jobswipe.repository.recommendation.RecommendationCacheRepository;
+import ieti.jobswipe.repository.projection.CandidateApplicationProjection;
 import ieti.jobswipe.repository.projection.UserMatchProjection;
+import ieti.jobswipe.repository.recommendation.RecommendationCacheRepository;
 import ieti.jobswipe.repository.user.UserRepository;
 import ieti.jobswipe.repository.vacancy.VacancyRepository;
 import ieti.jobswipe.repository.vacancy.VacancySwipeRepository;
@@ -64,6 +65,13 @@ import ieti.jobswipe.service.matching.MatchingService;
 
 @Service
 public class VacancyService {
+    private static final String VACANTE = "Vacante";
+    private static final String ACTOR_USER_ID = "actorUserId";
+    private static final String VACANCY_ID = "vacancyId";
+    private static final String VACANCY_TITLE = "vacancyTitle";
+    private static final String COUNTERPART_ID = "counterpartId";
+    private static final String COUNTERPART_NAME = "counterpartName";
+    private static final String NOTIFICATION_MATCH = "notification.match";
 
     private static final String CACHE_VACANCIES_FOR_USER = "vacanciesForUser";
     private static final String CACHE_COMPANY_ACTIVITY = "companyActivity";
@@ -91,7 +99,6 @@ public class VacancyService {
     private final VacancySwipeRepository vacancySwipeRepository;
     private final CompanyCandidateDecisionRepository companyCandidateDecisionRepository;
     private final CacheManager cacheManager;
-    @Autowired(required = false)
     private ChatRealtimeService chatRealtimeService;
 
     @Value("${app.recommendations.cache.ttl-seconds:1800}")
@@ -113,6 +120,11 @@ public class VacancyService {
         this.vacancySwipeRepository = vacancySwipeRepository;
         this.companyCandidateDecisionRepository = companyCandidateDecisionRepository;
         this.cacheManager = cacheManager;
+    }
+
+    @Autowired(required = false)
+    public void setChatRealtimeService(ChatRealtimeService chatRealtimeService) {
+        this.chatRealtimeService = chatRealtimeService;
     }
 
     public List<Vacancy> getAllVacancies() {
@@ -229,7 +241,7 @@ public class VacancyService {
 
             activity.add(CompanyLikeActivityResponse.builder()
                     .vacancyId(like.getVacancyId())
-                    .vacancyTitle(vacancyTitles.getOrDefault(like.getVacancyId(), "Vacante"))
+                    .vacancyTitle(vacancyTitles.getOrDefault(like.getVacancyId(), VACANTE))
                     .candidateId(candidateId)
                     .candidateName(candidateName)
                     .likedAt(like.getUpdatedAt())
@@ -288,73 +300,22 @@ public class VacancyService {
     public List<VacancyApplicantResponse> getApplicantsByVacancy(Long companyId, Long vacancyId, Integer limit) {
         int effectiveLimit = Math.max(1, Math.min(limit != null ? limit : 50, 200));
 
-        Vacancy vacancy = vacancyRepository.findById(vacancyId)
-                .orElseThrow(() -> new VacancyNotFoundException(ErrorMessages.VACANCY_NOT_FOUND));
-
-        if (vacancy.getCompany() == null || !companyId.equals(vacancy.getCompany().getId())) {
-            throw new VacancyNotFoundException(ErrorMessages.VACANCY_NOT_FOUND);
-        }
+        getCompanyVacancyOrThrow(companyId, vacancyId);
 
         List<VacancySwipe> likes = vacancySwipeRepository.findByVacancyIdAndDecisionOrderByUpdatedAtDesc(
                 vacancyId,
                 SwipeDecisionType.LIKE,
                 PageRequest.of(0, effectiveLimit));
 
-        List<Long> candidateIds = new ArrayList<>(likes.size());
-        for (VacancySwipe like : likes) {
-            candidateIds.add(like.getUserId());
-        }
+        List<Long> candidateIds = extractCandidateIds(likes);
         if (candidateIds.isEmpty()) {
             return List.of();
         }
 
-        List<CompanyCandidateDecision> decisions = companyCandidateDecisionRepository != null
-            ? companyCandidateDecisionRepository.findByCompanyIdAndVacancyIdAndCandidateIdIn(
-                companyId,
-                vacancyId,
-                candidateIds)
-            : List.of();
-        Set<Long> decidedCandidateIds = new HashSet<>();
-        if (decisions != null) {
-            for (CompanyCandidateDecision decision : decisions) {
-                decidedCandidateIds.add(decision.getCandidateId());
-            }
-        }
-
-        Map<Long, RecommendationCache> cacheByUserId = new HashMap<>();
-        for (RecommendationCache cache : recommendationCacheRepository.findByVacancyIdAndUserIdIn(vacancyId, candidateIds)) {
-            cacheByUserId.put(cache.getUserId(), cache);
-        }
-
-        Map<Long, String> candidateNames = new HashMap<>();
-        for (User candidate : userRepository.findAllById(candidateIds)) {
-            candidateNames.put(candidate.getId(), candidate.getName());
-        }
-
-        List<VacancyApplicantResponse> applicants = new ArrayList<>(likes.size());
-        for (VacancySwipe like : likes) {
-            Long candidateId = like.getUserId();
-            if (decidedCandidateIds.contains(candidateId)) {
-                continue;
-            }
-            RecommendationCache cache = cacheByUserId.get(candidateId);
-
-            String candidateName = candidateNames.get(candidateId);
-            if (candidateName == null) {
-                candidateName = "Usuario " + candidateId;
-            }
-
-            applicants.add(VacancyApplicantResponse.builder()
-                    .candidateId(candidateId)
-                    .candidateName(candidateName)
-                    .compatibilityPercentage(cache != null ? cache.getCompatibilityPercentage() : null)
-                    .compatibilityLevel(cache != null ? cache.getCompatibilityLevel() : null)
-                    .feedback(cache != null ? cache.getFeedback() : null)
-                    .appliedAt(like.getUpdatedAt())
-                    .build());
-        }
-
-        return applicants;
+        Set<Long> decidedCandidateIds = findDecidedCandidateIds(companyId, vacancyId, candidateIds);
+        Map<Long, RecommendationCache> cacheByUserId = findRecommendationCacheByUserId(vacancyId, candidateIds);
+        Map<Long, String> candidateNames = findCandidateNamesById(candidateIds);
+        return buildApplicantResponses(likes, decidedCandidateIds, cacheByUserId, candidateNames);
     }
 
     @Transactional(readOnly = true)
@@ -458,72 +419,22 @@ public class VacancyService {
         Vacancy vacancy = vacancyRepository.findById(vacancyId)
             .orElseThrow(() -> new VacancyNotFoundException(ErrorMessages.VACANCY_NOT_FOUND));
 
-        VacancySwipe entity = vacancySwipeRepository.findByUserIdAndVacancyId(userId, vacancyId)
-            .orElseGet(VacancySwipe::new);
-        entity.setUserId(userId);
-        entity.setVacancyId(vacancy.getId());
-        entity.setDecision(decision);
-        vacancySwipeRepository.save(entity);
+        saveSwipeDecision(userId, vacancy, decision);
         invalidateSwipeCaches(userId, vacancy);
 
-        if (decision == SwipeDecisionType.LIKE && vacancy.getCompany() != null) {
-            Long companyId = vacancy.getCompany().getId();
-            String vacancyTitle = StringUtils.hasText(vacancy.getTitle()) ? vacancy.getTitle() : "Vacante";
-            User candidate = userRepository.findById(userId).orElse(null);
-            String candidateName = candidate != null && StringUtils.hasText(candidate.getName())
-                ? candidate.getName()
-                : "Candidato";
-
-            boolean matched = companyCandidateDecisionRepository
-                .existsByCompanyIdAndCandidateIdAndVacancyIdAndDecision(
-                    companyId,
-                    userId,
-                    vacancyId,
-                    SwipeDecisionType.LIKE);
-
-            Map<String, Object> companyLikePayload = new HashMap<>();
-            companyLikePayload.put("actorUserId", userId);
-            companyLikePayload.put("vacancyId", vacancyId);
-            companyLikePayload.put("vacancyTitle", vacancyTitle);
-            companyLikePayload.put("candidateId", userId);
-            companyLikePayload.put("candidateName", candidateName);
-            companyLikePayload.put("matched", matched);
-            publishRealtimeNotification(companyId, "notification.company_like", companyLikePayload);
-
-            if (matched) {
-            Map<String, Object> candidateMatchPayload = new HashMap<>();
-            candidateMatchPayload.put("actorUserId", userId);
-            candidateMatchPayload.put("vacancyId", vacancyId);
-            candidateMatchPayload.put("vacancyTitle", vacancyTitle);
-            candidateMatchPayload.put("counterpartId", companyId);
-            candidateMatchPayload.put("counterpartName", vacancy.getCompany().getName());
-
-            Map<String, Object> companyMatchPayload = new HashMap<>();
-            companyMatchPayload.put("actorUserId", userId);
-            companyMatchPayload.put("vacancyId", vacancyId);
-            companyMatchPayload.put("vacancyTitle", vacancyTitle);
-            companyMatchPayload.put("counterpartId", userId);
-            companyMatchPayload.put("counterpartName", candidateName);
-
-            publishRealtimeNotification(userId, "notification.match", candidateMatchPayload);
-            publishRealtimeNotification(companyId, "notification.match", companyMatchPayload);
-            }
+        if (decision != SwipeDecisionType.LIKE || vacancy.getCompany() == null) {
+            return;
         }
+
+        notifyCompanyLike(userId, vacancyId, vacancy);
         }
 
         public CompanyCandidateDecisionResponse registerCompanyCandidateDecision(
             Long companyId,
             Long vacancyId,
             Long candidateId,
-            SwipeDecisionType decision,
-            String rejectionReason,
-            List<String> rejectionTags,
-            List<String> missingTechnologies,
-            List<String> missingResponsibilities,
-            List<String> missingTechnicalRequirements,
-            String expectedExperienceLevel,
-            String aiSummary,
-            String rejectionComment) {
+            CompanyCandidateDecisionRequest request) {
+        SwipeDecisionType decision = request.getDecision();
         User company = userRepository.findById(companyId)
             .orElseThrow(() -> new RuntimeException(ErrorMessages.USER_NOT_FOUND));
         if (company.getRole() != Role.COMPANY) {
@@ -550,21 +461,21 @@ public class VacancyService {
         entity.setVacancyId(vacancyId);
         entity.setDecision(decision);
         if (decision == SwipeDecisionType.DISLIKE) {
-            entity.setRejectionReason(normalizeText(rejectionReason, 120));
-            entity.setRejectionTags(normalizeCsv(rejectionTags, 600));
-            entity.setMissingTechnologies(normalizeCsv(missingTechnologies, 600));
-            entity.setMissingResponsibilities(normalizeCsv(missingResponsibilities, 1200));
-            entity.setMissingTechnicalRequirements(normalizeCsv(missingTechnicalRequirements, 1200));
-            entity.setExpectedExperienceLevel(normalizeText(expectedExperienceLevel, 32));
+            entity.setRejectionReason(normalizeText(request.getRejectionReason(), 120));
+            entity.setRejectionTags(normalizeCsv(request.getRejectionTags(), 600));
+            entity.setMissingTechnologies(normalizeCsv(request.getMissingTechnologies(), 600));
+            entity.setMissingResponsibilities(normalizeCsv(request.getMissingResponsibilities(), 1200));
+            entity.setMissingTechnicalRequirements(normalizeCsv(request.getMissingTechnicalRequirements(), 1200));
+            entity.setExpectedExperienceLevel(normalizeText(request.getExpectedExperienceLevel(), 32));
 
             String fallbackAiSummary = recommendationCacheRepository
                     .findByUserIdAndVacancyId(candidateId, vacancyId)
                     .map(RecommendationCache::getFeedback)
                     .orElse(null);
             entity.setAiSummary(normalizeText(
-                    StringUtils.hasText(aiSummary) ? aiSummary : fallbackAiSummary,
+                    StringUtils.hasText(request.getAiSummary()) ? request.getAiSummary() : fallbackAiSummary,
                     5000));
-            entity.setRejectionComment(normalizeText(rejectionComment, 1200));
+            entity.setRejectionComment(normalizeText(request.getRejectionComment(), 1200));
         } else {
             entity.setRejectionReason(null);
             entity.setRejectionTags(null);
@@ -584,14 +495,14 @@ public class VacancyService {
         boolean matched = decision == SwipeDecisionType.LIKE && candidateLikedVacancy;
         invalidateCompanyDecisionCaches(companyId, candidateId, vacancyId);
 
-        String vacancyTitle = StringUtils.hasText(vacancy.getTitle()) ? vacancy.getTitle() : "Vacante";
+        String vacancyTitle = StringUtils.hasText(vacancy.getTitle()) ? vacancy.getTitle() : VACANTE;
         String companyName = StringUtils.hasText(company.getName()) ? company.getName() : "Empresa";
         String candidateName = StringUtils.hasText(candidate.getName()) ? candidate.getName() : "Candidato";
 
         Map<String, Object> candidateDecisionPayload = new HashMap<>();
-        candidateDecisionPayload.put("actorUserId", companyId);
-        candidateDecisionPayload.put("vacancyId", vacancyId);
-        candidateDecisionPayload.put("vacancyTitle", vacancyTitle);
+        candidateDecisionPayload.put(ACTOR_USER_ID, companyId);
+        candidateDecisionPayload.put(VACANCY_ID, vacancyId);
+        candidateDecisionPayload.put(VACANCY_TITLE, vacancyTitle);
         candidateDecisionPayload.put("companyId", companyId);
         candidateDecisionPayload.put("companyName", companyName);
         candidateDecisionPayload.put("decision", decision.name());
@@ -600,21 +511,21 @@ public class VacancyService {
 
         if (matched) {
             Map<String, Object> candidateMatchPayload = new HashMap<>();
-            candidateMatchPayload.put("actorUserId", companyId);
-            candidateMatchPayload.put("vacancyId", vacancyId);
-            candidateMatchPayload.put("vacancyTitle", vacancyTitle);
-            candidateMatchPayload.put("counterpartId", companyId);
-            candidateMatchPayload.put("counterpartName", companyName);
+            candidateMatchPayload.put(ACTOR_USER_ID, companyId);
+            candidateMatchPayload.put(VACANCY_ID, vacancyId);
+            candidateMatchPayload.put(VACANCY_TITLE, vacancyTitle);
+            candidateMatchPayload.put(COUNTERPART_ID, companyId);
+            candidateMatchPayload.put(COUNTERPART_NAME, companyName);
 
             Map<String, Object> companyMatchPayload = new HashMap<>();
-            companyMatchPayload.put("actorUserId", companyId);
-            companyMatchPayload.put("vacancyId", vacancyId);
-            companyMatchPayload.put("vacancyTitle", vacancyTitle);
-            companyMatchPayload.put("counterpartId", candidateId);
-            companyMatchPayload.put("counterpartName", candidateName);
+            companyMatchPayload.put(ACTOR_USER_ID, companyId);
+            companyMatchPayload.put(VACANCY_ID, vacancyId);
+            companyMatchPayload.put(VACANCY_TITLE, vacancyTitle);
+            companyMatchPayload.put(COUNTERPART_ID, candidateId);
+            companyMatchPayload.put(COUNTERPART_NAME, candidateName);
 
-            publishRealtimeNotification(candidateId, "notification.match", candidateMatchPayload);
-            publishRealtimeNotification(companyId, "notification.match", companyMatchPayload);
+            publishRealtimeNotification(candidateId, NOTIFICATION_MATCH, candidateMatchPayload);
+            publishRealtimeNotification(companyId, NOTIFICATION_MATCH, companyMatchPayload);
         }
 
         return CompanyCandidateDecisionResponse.builder()
@@ -632,6 +543,93 @@ public class VacancyService {
             .aiSummary(entity.getAiSummary())
             .rejectionComment(entity.getRejectionComment())
             .build();
+        }
+
+        private void saveSwipeDecision(Long userId, Vacancy vacancy, SwipeDecisionType decision) {
+        VacancySwipe entity = vacancySwipeRepository.findByUserIdAndVacancyId(userId, vacancy.getId())
+            .orElseGet(VacancySwipe::new);
+        entity.setUserId(userId);
+        entity.setVacancyId(vacancy.getId());
+        entity.setDecision(decision);
+        vacancySwipeRepository.save(entity);
+        }
+
+        private void notifyCompanyLike(Long userId, Long vacancyId, Vacancy vacancy) {
+        Long companyId = vacancy.getCompany().getId();
+        String vacancyTitle = getVacancyTitleOrDefault(vacancy);
+        String candidateName = getCandidateNameOrDefault(userId);
+        boolean matched = hasCompanyLikedCandidate(companyId, userId, vacancyId);
+
+        publishRealtimeNotification(
+            companyId,
+            "notification.company_like",
+            buildCompanyLikePayload(userId, vacancyId, vacancyTitle, candidateName, matched));
+
+        if (!matched) {
+            return;
+        }
+
+        publishMatchNotifications(userId, companyId, vacancyId, vacancyTitle, vacancy.getCompany().getName(), candidateName);
+        }
+
+        private String getVacancyTitleOrDefault(Vacancy vacancy) {
+        return StringUtils.hasText(vacancy.getTitle()) ? vacancy.getTitle() : VACANTE;
+        }
+
+        private String getCandidateNameOrDefault(Long candidateId) {
+        User candidate = userRepository.findById(candidateId).orElse(null);
+        return candidate != null && StringUtils.hasText(candidate.getName())
+            ? candidate.getName()
+            : "Candidato";
+        }
+
+        private boolean hasCompanyLikedCandidate(Long companyId, Long candidateId, Long vacancyId) {
+        return companyCandidateDecisionRepository.existsByCompanyIdAndCandidateIdAndVacancyIdAndDecision(
+            companyId,
+            candidateId,
+            vacancyId,
+            SwipeDecisionType.LIKE);
+        }
+
+        private Map<String, Object> buildCompanyLikePayload(
+            Long userId,
+            Long vacancyId,
+            String vacancyTitle,
+            String candidateName,
+            boolean matched) {
+        Map<String, Object> companyLikePayload = new HashMap<>();
+        companyLikePayload.put(ACTOR_USER_ID, userId);
+        companyLikePayload.put(VACANCY_ID, vacancyId);
+        companyLikePayload.put(VACANCY_TITLE, vacancyTitle);
+        companyLikePayload.put("candidateId", userId);
+        companyLikePayload.put("candidateName", candidateName);
+        companyLikePayload.put("matched", matched);
+        return companyLikePayload;
+        }
+
+        private void publishMatchNotifications(
+            Long actorUserId,
+            Long companyId,
+            Long vacancyId,
+            String vacancyTitle,
+            String companyName,
+            String candidateName) {
+        Map<String, Object> candidateMatchPayload = new HashMap<>();
+        candidateMatchPayload.put(ACTOR_USER_ID, actorUserId);
+        candidateMatchPayload.put(VACANCY_ID, vacancyId);
+        candidateMatchPayload.put(VACANCY_TITLE, vacancyTitle);
+        candidateMatchPayload.put(COUNTERPART_ID, companyId);
+        candidateMatchPayload.put(COUNTERPART_NAME, companyName);
+
+        Map<String, Object> companyMatchPayload = new HashMap<>();
+        companyMatchPayload.put(ACTOR_USER_ID, actorUserId);
+        companyMatchPayload.put(VACANCY_ID, vacancyId);
+        companyMatchPayload.put(VACANCY_TITLE, vacancyTitle);
+        companyMatchPayload.put(COUNTERPART_ID, actorUserId);
+        companyMatchPayload.put(COUNTERPART_NAME, candidateName);
+
+        publishRealtimeNotification(actorUserId, NOTIFICATION_MATCH, candidateMatchPayload);
+        publishRealtimeNotification(companyId, NOTIFICATION_MATCH, companyMatchPayload);
         }
 
         @Transactional(readOnly = true)
@@ -658,7 +656,7 @@ public class VacancyService {
 
                 applications.add(CandidateApplicationResponse.builder()
                         .vacancyId(row.getVacancyId())
-                        .vacancyTitle(row.getVacancyTitle() != null ? row.getVacancyTitle() : "Vacante")
+                        .vacancyTitle(row.getVacancyTitle() != null ? row.getVacancyTitle() : VACANTE)
                         .companyId(row.getCompanyId())
                         .companyName(row.getCompanyName() != null ? row.getCompanyName() : "Empresa")
                         .appliedAt(row.getAppliedAt())
@@ -711,7 +709,7 @@ public class VacancyService {
             for (UserMatchProjection row : rows) {
                 matches.add(UserMatchResponse.builder()
                         .vacancyId(row.getVacancyId())
-                        .vacancyTitle(row.getVacancyTitle() != null ? row.getVacancyTitle() : "Vacante")
+                        .vacancyTitle(row.getVacancyTitle() != null ? row.getVacancyTitle() : VACANTE)
                         .counterpartId(row.getCounterpartId())
                         .counterpartName(row.getCounterpartName() != null ? row.getCounterpartName() : "Usuario")
                         .matchedAt(row.getMatchedAt())
@@ -898,22 +896,7 @@ public class VacancyService {
         int effectiveLimit = limit != null ? limit : 20;
 
         Set<Long> swipedVacancyIds = new HashSet<>(vacancySwipeRepository.findSwipedVacancyIdsByUserId(userId));
-        List<Vacancy> vacancies;
-        if (swipedVacancyIds.isEmpty()) {
-            vacancies = vacancyRepository.findAll();
-        } else {
-            vacancies = vacancyRepository.findAllNotSwipedByUser(userId);
-            if (vacancies.isEmpty()) {
-                List<Vacancy> allVacancies = vacancyRepository.findAll();
-                List<Vacancy> filtered = new ArrayList<>();
-                for (Vacancy vacancy : allVacancies) {
-                    if (!swipedVacancyIds.contains(vacancy.getId())) {
-                        filtered.add(vacancy);
-                    }
-                }
-                vacancies = filtered;
-            }
-        }
+        List<Vacancy> vacancies = findAvailableVacanciesForUser(userId, swipedVacancyIds);
         List<VacancyRecommendationResponse> recommendations = new ArrayList<>();
         Instant cacheThreshold = Instant.now().minusSeconds(Math.max(60L, recommendationCacheTtlSeconds));
         LocalDateTime profileUpdatedAt = profileRepository.findUpdatedAtByUserId(userId)
@@ -921,40 +904,154 @@ public class VacancyService {
         int total = vacancies.size();
         int processed = 0;
 
-        if (progressListener != null) {
-            progressListener.onProgress(0, total, "Iniciando analisis de vacantes...");
-        }
+        startProgress(progressListener, total);
 
         for (Vacancy vacancy : vacancies) {
-            evaluateVacancyRecommendation(
+            Optional<VacancyRecommendationResponse> recommendation = evaluateVacancyRecommendation(
                     vacancy,
                     userId,
                     profileUpdatedAt,
                     cacheThreshold,
                     swipedVacancyIds,
-                    effectiveMinScore)
-                    .ifPresent(recommendation -> {
-                        recommendations.add(recommendation);
-                        if (progressListener != null) {
-                            progressListener.onRecommendation(recommendation);
-                        }
-                    });
+                    effectiveMinScore);
+            addRecommendation(recommendations, progressListener, recommendation);
 
             processed++;
             notifyProgress(progressListener, processed, total);
         }
 
+        return sortAndLimitRecommendations(recommendations, effectiveLimit);
+    }
+
+    private List<Long> extractCandidateIds(List<VacancySwipe> likes) {
+        List<Long> candidateIds = new ArrayList<>(likes.size());
+        for (VacancySwipe like : likes) {
+            candidateIds.add(like.getUserId());
+        }
+        return candidateIds;
+    }
+
+    private Set<Long> findDecidedCandidateIds(Long companyId, Long vacancyId, List<Long> candidateIds) {
+        List<CompanyCandidateDecision> decisions = companyCandidateDecisionRepository != null
+            ? companyCandidateDecisionRepository.findByCompanyIdAndVacancyIdAndCandidateIdIn(
+                companyId,
+                vacancyId,
+                candidateIds)
+            : List.of();
+        Set<Long> decidedCandidateIds = new HashSet<>();
+        if (decisions == null) {
+            return decidedCandidateIds;
+        }
+        for (CompanyCandidateDecision decision : decisions) {
+            decidedCandidateIds.add(decision.getCandidateId());
+        }
+        return decidedCandidateIds;
+    }
+
+    private Map<Long, RecommendationCache> findRecommendationCacheByUserId(Long vacancyId, List<Long> candidateIds) {
+        Map<Long, RecommendationCache> cacheByUserId = new HashMap<>();
+        for (RecommendationCache cache : recommendationCacheRepository.findByVacancyIdAndUserIdIn(vacancyId, candidateIds)) {
+            cacheByUserId.put(cache.getUserId(), cache);
+        }
+        return cacheByUserId;
+    }
+
+    private Map<Long, String> findCandidateNamesById(List<Long> candidateIds) {
+        Map<Long, String> candidateNames = new HashMap<>();
+        for (User candidate : userRepository.findAllById(candidateIds)) {
+            candidateNames.put(candidate.getId(), candidate.getName());
+        }
+        return candidateNames;
+    }
+
+    private List<VacancyApplicantResponse> buildApplicantResponses(
+            List<VacancySwipe> likes,
+            Set<Long> decidedCandidateIds,
+            Map<Long, RecommendationCache> cacheByUserId,
+            Map<Long, String> candidateNames) {
+        List<VacancyApplicantResponse> applicants = new ArrayList<>(likes.size());
+        for (VacancySwipe like : likes) {
+            Long candidateId = like.getUserId();
+            if (decidedCandidateIds.contains(candidateId)) {
+                continue;
+            }
+
+            RecommendationCache cache = cacheByUserId.get(candidateId);
+            String candidateName = candidateNames.get(candidateId);
+            if (candidateName == null) {
+                candidateName = "Usuario " + candidateId;
+            }
+
+            applicants.add(VacancyApplicantResponse.builder()
+                    .candidateId(candidateId)
+                    .candidateName(candidateName)
+                    .compatibilityPercentage(cache != null ? cache.getCompatibilityPercentage() : null)
+                    .compatibilityLevel(cache != null ? cache.getCompatibilityLevel() : null)
+                    .feedback(cache != null ? cache.getFeedback() : null)
+                    .appliedAt(like.getUpdatedAt())
+                    .build());
+        }
+        return applicants;
+    }
+
+    private List<Vacancy> findAvailableVacanciesForUser(Long userId, Set<Long> swipedVacancyIds) {
+        if (swipedVacancyIds.isEmpty()) {
+            return vacancyRepository.findAll();
+        }
+
+        List<Vacancy> vacancies = vacancyRepository.findAllNotSwipedByUser(userId);
+        if (!vacancies.isEmpty()) {
+            return vacancies;
+        }
+
+        List<Vacancy> filtered = new ArrayList<>();
+        for (Vacancy vacancy : vacancyRepository.findAll()) {
+            if (!swipedVacancyIds.contains(vacancy.getId())) {
+                filtered.add(vacancy);
+            }
+        }
+        return filtered;
+    }
+
+    private void startProgress(RecommendationProgressListener progressListener, int total) {
+        if (progressListener != null) {
+            progressListener.onProgress(0, total, "Iniciando analisis de vacantes...");
+        }
+    }
+
+    private void addRecommendation(
+            List<VacancyRecommendationResponse> recommendations,
+            RecommendationProgressListener progressListener,
+            Optional<VacancyRecommendationResponse> recommendation) {
+        recommendation.ifPresent(foundRecommendation -> {
+            recommendations.add(foundRecommendation);
+            if (progressListener != null) {
+                progressListener.onRecommendation(foundRecommendation);
+            }
+        });
+    }
+
+    private List<VacancyRecommendationResponse> sortAndLimitRecommendations(
+            List<VacancyRecommendationResponse> recommendations,
+            int effectiveLimit) {
         recommendations.sort(
                 Comparator.comparing(
                         VacancyRecommendationResponse::getCompatibilityPercentage,
                         Comparator.nullsLast(Float::compareTo))
                         .reversed());
-
         if (recommendations.size() > effectiveLimit) {
             return recommendations.subList(0, effectiveLimit);
         }
-
         return recommendations;
+    }
+
+    private Vacancy getCompanyVacancyOrThrow(Long companyId, Long vacancyId) {
+        Vacancy vacancy = vacancyRepository.findById(vacancyId)
+                .orElseThrow(() -> new VacancyNotFoundException(ErrorMessages.VACANCY_NOT_FOUND));
+        if (vacancy.getCompany() == null || !companyId.equals(vacancy.getCompany().getId())) {
+            throw new VacancyNotFoundException(ErrorMessages.VACANCY_NOT_FOUND);
+        }
+        return vacancy;
     }
 
     private Optional<VacancyRecommendationResponse> evaluateVacancyRecommendation(

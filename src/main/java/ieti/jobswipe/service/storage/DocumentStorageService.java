@@ -1,14 +1,5 @@
 package ieti.jobswipe.service.storage;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,6 +7,17 @@ import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import ieti.jobswipe.exception.DocumentStorageException;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @Service
 public class DocumentStorageService {
@@ -54,7 +56,10 @@ public class DocumentStorageService {
             throw new IllegalArgumentException("Document exceeds 5MB size limit");
         }
 
-        String originalFilename = document.getOriginalFilename() != null ? document.getOriginalFilename() : "document";
+        String originalFilename = document.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) {
+            originalFilename = "document";
+        }
         String extension = extractExtension(originalFilename);
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             throw new IllegalArgumentException("Document type is not allowed");
@@ -81,7 +86,7 @@ public class DocumentStorageService {
                     document.getContentType(),
                     document.getSize());
         } catch (IOException exception) {
-            throw new RuntimeException("Failed to store document", exception);
+            throw new DocumentStorageException("Failed to store document", exception);
         }
     }
 
@@ -113,7 +118,7 @@ public class DocumentStorageService {
                     document.getContentType(),
                     document.getSize());
         } catch (IOException exception) {
-            throw new RuntimeException("Failed to store document", exception);
+            throw new DocumentStorageException("Failed to store document", exception);
         }
     }
 

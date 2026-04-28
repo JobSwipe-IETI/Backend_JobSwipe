@@ -12,6 +12,8 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpEntity;
@@ -117,29 +119,10 @@ class ChatRealtimeServiceTest {
         verify(restTemplate, never()).postForEntity(any(String.class), any(HttpEntity.class), eq(Void.class));
     }
 
-    @Test
-    void shouldNotPublishWhenConfigurationDisabledByBlankUrl() {
-        ReflectionTestUtils.setField(service, "supabaseUrl", " ");
-        ChatRealtimeEventResponse event = ChatRealtimeEventResponse.builder().type("X").payload(Map.of()).build();
-
-        service.publishToUser(77L, event);
-
-        verify(restTemplate, never()).postForEntity(any(String.class), any(HttpEntity.class), eq(Void.class));
-    }
-
-    @Test
-    void shouldNotPublishWhenServiceRoleKeyIsBlank() {
-        ReflectionTestUtils.setField(service, "supabaseServiceRoleKey", " ");
-        ChatRealtimeEventResponse event = ChatRealtimeEventResponse.builder().type("X").payload(Map.of()).build();
-
-        service.publishToUser(77L, event);
-
-        verify(restTemplate, never()).postForEntity(any(String.class), any(HttpEntity.class), eq(Void.class));
-    }
-
-    @Test
-    void shouldNotPublishWhenNotificationsTableIsBlank() {
-        ReflectionTestUtils.setField(service, "realtimeNotificationsTable", " ");
+    @ParameterizedTest
+    @ValueSource(strings = { "supabaseUrl", "supabaseServiceRoleKey", "realtimeNotificationsTable" })
+    void shouldNotPublishWhenRequiredConfigurationFieldIsBlank(String fieldName) {
+        ReflectionTestUtils.setField(service, fieldName, " ");
         ChatRealtimeEventResponse event = ChatRealtimeEventResponse.builder().type("X").payload(Map.of()).build();
 
         service.publishToUser(77L, event);
