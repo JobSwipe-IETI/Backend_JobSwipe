@@ -9,7 +9,6 @@ import ieti.jobswipe.model.Profile;
 import ieti.jobswipe.model.Vacancy;
 import ieti.jobswipe.repository.ProfileRepository;
 import ieti.jobswipe.repository.VacancyRepository;
-import ieti.jobswipe.service.MatchingService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

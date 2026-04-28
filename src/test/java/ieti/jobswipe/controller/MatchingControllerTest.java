@@ -2,7 +2,6 @@ package ieti.jobswipe.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ieti.jobswipe.controller.MatchingController;
 import ieti.jobswipe.dto.MatchingRequest;
 import ieti.jobswipe.dto.MatchingResponse;
 import ieti.jobswipe.service.MatchingService;

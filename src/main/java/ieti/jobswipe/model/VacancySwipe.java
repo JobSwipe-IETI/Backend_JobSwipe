@@ -27,7 +27,9 @@ import lombok.Setter;
                 @UniqueConstraint(name = "uk_vacancy_swipes_user_vacancy", columnNames = { "user_id", "vacancy_id" })
         },
         indexes = {
-                @Index(name = "idx_vacancy_swipes_user", columnList = "user_id")
+            @Index(name = "idx_vacancy_swipes_user", columnList = "user_id"),
+            @Index(name = "idx_vacancy_swipes_vacancy_decision_updated", columnList = "vacancy_id,decision,updated_at"),
+            @Index(name = "idx_vacancy_swipes_user_vacancy_decision", columnList = "user_id,vacancy_id,decision")
         })
 @Getter
 @Setter

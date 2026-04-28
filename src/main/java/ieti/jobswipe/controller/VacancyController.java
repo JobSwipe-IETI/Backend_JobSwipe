@@ -1,15 +1,10 @@
 package ieti.jobswipe.controller;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import ieti.jobswipe.dto.CreateVacancyRequest;
-import ieti.jobswipe.dto.VacancyRecommendationResponse;
-import ieti.jobswipe.model.SwipeDecisionType;
-import ieti.jobswipe.model.Vacancy;
-import ieti.jobswipe.service.RecommendationJobService;
-import ieti.jobswipe.service.VacancyService;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,14 +19,30 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import ieti.jobswipe.dto.CompanyLikeActivityResponse;
+import ieti.jobswipe.dto.CandidateApplicationResponse;
+import ieti.jobswipe.dto.CompanyCandidateDecisionRequest;
+import ieti.jobswipe.dto.CompanyCandidateDecisionResponse;
+import ieti.jobswipe.dto.CompanyVacancyPipelineResponse;
+import ieti.jobswipe.dto.CreateVacancyRequest;
+import ieti.jobswipe.dto.UserMatchResponse;
+import ieti.jobswipe.dto.VacancyApplicantResponse;
+import ieti.jobswipe.dto.VacancyRecommendationResponse;
+import ieti.jobswipe.model.SwipeDecisionType;
+import ieti.jobswipe.model.Vacancy;
+import ieti.jobswipe.service.RecommendationJobService;
+import ieti.jobswipe.service.VacancyService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/vacancies")
 @Tag(name = "Vacancies", description = "Vacancy management endpoints")
 public class VacancyController {
+
+    private static final String MESSAGE_KEY = "message";
 
     private final VacancyService vacancyService;
     private final RecommendationJobService recommendationJobService;
@@ -66,6 +77,144 @@ public class VacancyController {
 
         Long userId = Long.parseLong(jwt.getSubject());
         return ResponseEntity.ok(vacancyService.getRecommendedVacancies(userId, minScore, limit));
+    }
+
+    @GetMapping("/company/activity")
+    @Operation(summary = "Get recent likes for company vacancies")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Company activity retrieved successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid limit parameter")
+    })
+    public ResponseEntity<List<CompanyLikeActivityResponse>> getCompanyActivity(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "20") Integer limit) {
+        if (limit <= 0 || limit > 100) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Long companyId = Long.parseLong(jwt.getSubject());
+        return ResponseEntity.ok(vacancyService.getCompanyLikeActivity(companyId, limit));
+    }
+
+    @GetMapping("/company/pipeline")
+    @Operation(summary = "Get company vacancies with applicant stats")
+    @ApiResponse(responseCode = "200", description = "Company vacancy pipeline retrieved successfully")
+    public ResponseEntity<List<CompanyVacancyPipelineResponse>> getCompanyVacancyPipeline(
+            @AuthenticationPrincipal Jwt jwt) {
+        Long companyId = Long.parseLong(jwt.getSubject());
+        return ResponseEntity.ok(vacancyService.getCompanyVacancyPipeline(companyId));
+    }
+
+    @GetMapping("/company/vacancies/{vacancyId}/applicants")
+    @Operation(summary = "Get applicants for a company vacancy with compatibility details")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Applicants retrieved successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid limit parameter"),
+        @ApiResponse(responseCode = "404", description = "Vacancy not found")
+    })
+    public ResponseEntity<List<VacancyApplicantResponse>> getApplicantsByVacancy(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long vacancyId,
+            @RequestParam(defaultValue = "50") Integer limit) {
+        if (limit <= 0 || limit > 200) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Long companyId = Long.parseLong(jwt.getSubject());
+        try {
+            return ResponseEntity.ok(vacancyService.getApplicantsByVacancy(companyId, vacancyId, limit));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
+
+    @PostMapping("/company/vacancies/{vacancyId}/candidates/{candidateId}/decision")
+    @Operation(summary = "Register company decision (LIKE/DISLIKE) for a candidate in a vacancy")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Decision stored successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid request"),
+        @ApiResponse(responseCode = "404", description = "Vacancy or user not found")
+    })
+    public ResponseEntity<CompanyCandidateDecisionResponse> registerCompanyCandidateDecision(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long vacancyId,
+            @PathVariable Long candidateId,
+            @RequestBody(required = false) CompanyCandidateDecisionRequest request,
+            @RequestParam(required = false) SwipeDecisionType decision) {
+        try {
+            Long companyId = Long.parseLong(jwt.getSubject());
+            SwipeDecisionType resolvedDecision = request != null && request.getDecision() != null
+                    ? request.getDecision()
+                    : decision;
+            if (resolvedDecision == null) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            CompanyCandidateDecisionResponse response = vacancyService.registerCompanyCandidateDecision(
+                    companyId,
+                    vacancyId,
+                    candidateId,
+                    resolvedDecision,
+                    request != null ? request.getRejectionReason() : null,
+                    request != null ? request.getRejectionTags() : null,
+                    request != null ? request.getMissingTechnologies() : null,
+                        request != null ? request.getMissingResponsibilities() : null,
+                        request != null ? request.getMissingTechnicalRequirements() : null,
+                        request != null ? request.getExpectedExperienceLevel() : null,
+                        request != null ? request.getAiSummary() : null,
+                    request != null ? request.getRejectionComment() : null);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().build();
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
+
+    @GetMapping("/applications")
+    @Operation(summary = "Get applications for authenticated candidate")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Applications retrieved successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid limit parameter"),
+        @ApiResponse(responseCode = "404", description = "User not found")
+    })
+    public ResponseEntity<List<CandidateApplicationResponse>> getApplications(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "30") Integer limit) {
+        if (limit <= 0 || limit > 100) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            Long candidateId = Long.parseLong(jwt.getSubject());
+            return ResponseEntity.ok(vacancyService.getCandidateApplications(candidateId, limit));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().build();
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
+
+    @GetMapping("/matches")
+    @Operation(summary = "Get matches for authenticated user")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Matches retrieved successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid limit parameter"),
+        @ApiResponse(responseCode = "404", description = "User not found")
+    })
+    public ResponseEntity<List<UserMatchResponse>> getMatches(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "20") Integer limit) {
+        if (limit <= 0 || limit > 100) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            Long userId = Long.parseLong(jwt.getSubject());
+            return ResponseEntity.ok(vacancyService.getMatchesForUser(userId, limit));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
     }
 
     @PostMapping("/{id}/swipe")
@@ -119,7 +268,7 @@ public class VacancyController {
 
     @GetMapping("/recommended/jobs/{jobId}/result")
     @Operation(summary = "Get async recommendation job result")
-    public ResponseEntity<?> getRecommendedVacanciesJobResult(
+    public ResponseEntity<Object> getRecommendedVacanciesJobResult(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String jobId) {
         Long userId = Long.parseLong(jwt.getSubject());
@@ -130,14 +279,53 @@ public class VacancyController {
 
         RecommendationJobService.RecommendationJob job = jobOpt.get();
         if (job.getStatus() == RecommendationJobService.JobStatus.RUNNING) {
-            return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("message", "Job still running"));
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(MESSAGE_KEY, "Job still running"));
         }
         if (job.getStatus() == RecommendationJobService.JobStatus.FAILED) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                    .body(Map.of("message", job.getError() != null ? job.getError() : "Job failed"));
+                    .body(Map.of(MESSAGE_KEY, job.getError() != null ? job.getError() : "Job failed"));
         }
 
         return ResponseEntity.ok(job.getResult());
+    }
+
+    @GetMapping("/recommended/jobs/{jobId}/partial")
+    @Operation(summary = "Get async recommendation partial result")
+    public ResponseEntity<Object> getRecommendedVacanciesJobPartial(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String jobId,
+            @RequestParam(defaultValue = "0") Integer offset,
+            @RequestParam(defaultValue = "10") Integer limit) {
+        if (offset < 0 || limit <= 0 || limit > 100) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Long userId = Long.parseLong(jwt.getSubject());
+        Optional<RecommendationJobService.RecommendationJob> jobOpt = recommendationJobService.getJob(jobId, userId);
+        if (jobOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        RecommendationJobService.RecommendationJob job = jobOpt.get();
+        List<VacancyRecommendationResponse> all = job.getResult();
+        int safeOffset = Math.min(offset, all.size());
+        int end = Math.min(safeOffset + limit, all.size());
+        List<VacancyRecommendationResponse> items = all.subList(safeOffset, end);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("jobId", job.getJobId());
+        response.put("status", job.getStatus().name());
+        response.put("processed", job.getProcessed());
+        response.put("total", job.getTotal());
+        response.put("progressPercent", job.getProgressPercent());
+        response.put("message", job.getMessage() != null ? job.getMessage() : "");
+        response.put("error", job.getError() != null ? job.getError() : "");
+        response.put("done", job.getStatus() != RecommendationJobService.JobStatus.RUNNING);
+        response.put("offset", safeOffset);
+        response.put("nextOffset", end);
+        response.put("items", items);
+
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")

@@ -2,7 +2,6 @@ package ieti.jobswipe.exception;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ieti.jobswipe.exception.ApiValidationExceptionHandler;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.BeforeEach;

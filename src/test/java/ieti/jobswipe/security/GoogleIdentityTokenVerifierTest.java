@@ -4,12 +4,6 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 
 import ieti.jobswipe.config.GoogleOAuthProperties;
-import ieti.jobswipe.security.AuthenticatedUser;
-import ieti.jobswipe.security.GoogleIdentityTokenVerifier;
-import ieti.jobswipe.security.InvalidIdentityTokenException;
-import ieti.jobswipe.security.AuthenticatedUser;
-import ieti.jobswipe.security.GoogleIdentityTokenVerifier;
-import ieti.jobswipe.security.InvalidIdentityTokenException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
