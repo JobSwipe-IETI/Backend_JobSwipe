@@ -19,6 +19,7 @@ import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -51,6 +52,9 @@ class AuthControllerTest {
         private JwtTokenService jwtTokenService;
 
         @Mock
+        private JwtDecoder jwtDecoder;
+
+        @Mock
         private UserService userService;
 
         @Mock
@@ -65,6 +69,7 @@ class AuthControllerTest {
         private AuthenticatedUser testAuthenticatedUser;
         private User testUser;
         private JwtTokenService.TokenPayload testTokenPayload;
+        private JwtTokenService.TokenPayload testRefreshTokenPayload;
 
         @BeforeEach
         void setUp() {
@@ -88,6 +93,7 @@ class AuthControllerTest {
                                 .build();
 
                 testTokenPayload = new JwtTokenService.TokenPayload("jwt-token-123", 3600);
+                testRefreshTokenPayload = new JwtTokenService.TokenPayload("refresh-token-123", 86400);
         }
 
         @Test
@@ -97,7 +103,8 @@ class AuthControllerTest {
 
                 when(identityTokenVerifier.verify(validIdToken)).thenReturn(testAuthenticatedUser);
                 when(userProvisioningService.ensureUserExists(testAuthenticatedUser)).thenReturn(testUser);
-                when(jwtTokenService.generateToken(testUser)).thenReturn(testTokenPayload);
+                when(jwtTokenService.generateAccessToken(testUser)).thenReturn(testTokenPayload);
+                when(jwtTokenService.generateRefreshToken(testUser)).thenReturn(testRefreshTokenPayload);
                 when(profileRepository.existsByUserId(1L)).thenReturn(false);
 
                 mockMvc.perform(post("/api/auth/google")
@@ -105,8 +112,10 @@ class AuthControllerTest {
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.accessToken", is("jwt-token-123")))
+                                .andExpect(jsonPath("$.refreshToken", is("refresh-token-123")))
                                 .andExpect(jsonPath("$.tokenType", is("Bearer")))
                                 .andExpect(jsonPath("$.expiresIn", is(3600)))
+                                .andExpect(jsonPath("$.refreshExpiresIn", is(86400)))
                                 .andExpect(jsonPath("$.hasProfile", is(false)))
                                 .andExpect(jsonPath("$.user.id", is(1)))
                                 .andExpect(jsonPath("$.user.email", is("john@example.com")))
@@ -115,7 +124,8 @@ class AuthControllerTest {
 
                 verify(identityTokenVerifier, times(1)).verify(validIdToken);
                 verify(userProvisioningService, times(1)).ensureUserExists(testAuthenticatedUser);
-                verify(jwtTokenService, times(1)).generateToken(testUser);
+                verify(jwtTokenService, times(1)).generateAccessToken(testUser);
+                verify(jwtTokenService, times(1)).generateRefreshToken(testUser);
                 verify(profileRepository, times(1)).existsByUserId(1L);
         }
 
@@ -148,7 +158,8 @@ class AuthControllerTest {
 
                 when(identityTokenVerifier.verify(validIdToken)).thenReturn(testAuthenticatedUser);
                 when(userProvisioningService.ensureUserExists(testAuthenticatedUser)).thenReturn(testUser);
-                when(jwtTokenService.generateToken(testUser)).thenReturn(testTokenPayload);
+                when(jwtTokenService.generateAccessToken(testUser)).thenReturn(testTokenPayload);
+                when(jwtTokenService.generateRefreshToken(testUser)).thenReturn(testRefreshTokenPayload);
                 when(profileRepository.existsByUserId(1L)).thenReturn(false);
 
                 mockMvc.perform(post("/api/auth/google")
@@ -157,7 +168,8 @@ class AuthControllerTest {
                                 .andExpect(status().isOk());
 
                 verify(userProvisioningService, times(1)).ensureUserExists(any(AuthenticatedUser.class));
-                verify(jwtTokenService, times(1)).generateToken(testUser);
+                verify(jwtTokenService, times(1)).generateAccessToken(testUser);
+                verify(jwtTokenService, times(1)).generateRefreshToken(testUser);
                 verify(profileRepository, times(1)).existsByUserId(1L);
         }
 
@@ -168,7 +180,8 @@ class AuthControllerTest {
 
                 when(identityTokenVerifier.verify(validIdToken)).thenReturn(testAuthenticatedUser);
                 when(userProvisioningService.ensureUserExists(testAuthenticatedUser)).thenReturn(testUser);
-                when(jwtTokenService.generateToken(testUser)).thenReturn(testTokenPayload);
+                when(jwtTokenService.generateAccessToken(testUser)).thenReturn(testTokenPayload);
+                when(jwtTokenService.generateRefreshToken(testUser)).thenReturn(testRefreshTokenPayload);
                 when(profileRepository.existsByUserId(1L)).thenReturn(true);
 
                 mockMvc.perform(post("/api/auth/google")
@@ -214,7 +227,8 @@ class AuthControllerTest {
                 AuthController.RoleUpdateRequest request = new AuthController.RoleUpdateRequest("COMPANY");
 
                 when(userService.updateUserRole(1L, Role.COMPANY)).thenReturn(updatedUser);
-                when(jwtTokenService.generateToken(updatedUser)).thenReturn(testTokenPayload);
+                when(jwtTokenService.generateAccessToken(updatedUser)).thenReturn(testTokenPayload);
+                when(jwtTokenService.generateRefreshToken(updatedUser)).thenReturn(testRefreshTokenPayload);
                 when(profileRepository.existsByUserId(1L)).thenReturn(false);
 
                 AuthController.AuthTokenResponse response = authController
@@ -223,8 +237,45 @@ class AuthControllerTest {
 
                 assertEquals("COMPANY", response.user().role());
                 assertEquals("jwt-token-123", response.accessToken());
+                assertEquals("refresh-token-123", response.refreshToken());
                 verify(userService, times(1)).updateUserRole(1L, Role.COMPANY);
-                verify(jwtTokenService, times(1)).generateToken(updatedUser);
+                verify(jwtTokenService, times(1)).generateAccessToken(updatedUser);
+                verify(jwtTokenService, times(1)).generateRefreshToken(updatedUser);
+        }
+
+        @Test
+        void shouldRefreshSessionWithValidRefreshToken() {
+                User refreshedUser = User.builder()
+                        .id(1L)
+                        .name("John Doe")
+                        .email("john@example.com")
+                        .googleId("google-subject-123")
+                        .avatarUrl("https://example.com/avatar.jpg")
+                        .role(Role.CANDIDATE)
+                        .build();
+
+                when(jwtDecoder.decode("refresh.jwt.token")).thenReturn(
+                        Jwt.withTokenValue("refresh.jwt.token")
+                                .header("alg", "HS256")
+                                .subject("1")
+                                .claim("token_use", "refresh")
+                                .build());
+                when(userService.getUserById(1L)).thenReturn(refreshedUser);
+                when(profileRepository.existsByUserId(1L)).thenReturn(true);
+                when(jwtTokenService.generateAccessToken(refreshedUser)).thenReturn(testTokenPayload);
+                when(jwtTokenService.generateRefreshToken(refreshedUser)).thenReturn(testRefreshTokenPayload);
+
+                AuthController.AuthTokenResponse response = authController
+                        .refreshSession(new AuthController.RefreshTokenRequest("refresh.jwt.token"))
+                        .getBody();
+
+                assertEquals("jwt-token-123", response.accessToken());
+                assertEquals("refresh-token-123", response.refreshToken());
+                assertEquals(true, response.hasProfile());
+                verify(jwtDecoder, times(1)).decode("refresh.jwt.token");
+                verify(userService, times(1)).getUserById(1L);
+                verify(jwtTokenService, times(1)).generateAccessToken(refreshedUser);
+                verify(jwtTokenService, times(1)).generateRefreshToken(refreshedUser);
         }
 
         @Test

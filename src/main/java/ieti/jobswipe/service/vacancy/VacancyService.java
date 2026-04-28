@@ -723,6 +723,7 @@ public class VacancyService {
         private void invalidateSwipeCaches(Long candidateId, Vacancy vacancy) {
             evictUserScopedVacancyCaches(candidateId);
             evictCandidateScopedCaches(candidateId);
+            evictUserMatches(candidateId);
 
             if (vacancy.getCompany() == null || vacancy.getCompany().getId() == null) {
                 return;

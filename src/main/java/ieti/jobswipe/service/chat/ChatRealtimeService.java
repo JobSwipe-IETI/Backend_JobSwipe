@@ -6,10 +6,12 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
@@ -35,10 +37,11 @@ public class ChatRealtimeService {
     @Value("${app.supabase.realtime.notifications-table:notification_events_realtime}")
     private String realtimeNotificationsTable;
 
-    public ChatRealtimeService(RestTemplate restTemplate) {
+    public ChatRealtimeService(@Qualifier("supabaseRealtimeRestTemplate") RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 
+    @Async("taskExecutor")
     public void publishToUser(Long userId, ChatRealtimeEventResponse event) {
         if (!isConfigured() || userId == null || event == null || !StringUtils.hasText(event.getType())) {
             return;

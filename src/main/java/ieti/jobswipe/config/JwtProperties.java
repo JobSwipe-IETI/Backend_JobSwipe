@@ -7,6 +7,7 @@ public class JwtProperties {
 
     private String issuer;
     private Long accessTokenExpirationSeconds;
+    private Long refreshTokenExpirationSeconds;
     private String secret;
 
     public String getIssuer() {
@@ -23,6 +24,14 @@ public class JwtProperties {
 
     public void setAccessTokenExpirationSeconds(Long accessTokenExpirationSeconds) {
         this.accessTokenExpirationSeconds = accessTokenExpirationSeconds;
+    }
+
+    public Long getRefreshTokenExpirationSeconds() {
+        return refreshTokenExpirationSeconds;
+    }
+
+    public void setRefreshTokenExpirationSeconds(Long refreshTokenExpirationSeconds) {
+        this.refreshTokenExpirationSeconds = refreshTokenExpirationSeconds;
     }
 
     public String getSecret() {
