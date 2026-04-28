@@ -20,7 +20,6 @@ import ieti.jobswipe.dto.company.CompanyCandidateDecisionRequest;
 import ieti.jobswipe.model.SwipeDecisionType;
 import ieti.jobswipe.model.entity.User;
 import ieti.jobswipe.model.entity.Vacancy;
-import ieti.jobswipe.model.entity.VacancySwipe;
 import ieti.jobswipe.repository.recommendation.RecommendationCacheRepository;
 import ieti.jobswipe.repository.company.CompanyCandidateDecisionRepository;
 import ieti.jobswipe.repository.profile.ProfileRepository;

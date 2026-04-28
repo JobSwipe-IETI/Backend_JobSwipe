@@ -7,7 +7,6 @@ import ieti.jobswipe.dto.company.CompanyProfileRequest;
 import ieti.jobswipe.dto.profile.CandidateExperienceRequest;
 import ieti.jobswipe.dto.profile.CandidateProfileRequest;
 import ieti.jobswipe.dto.profile.ProfileResponse;
-import ieti.jobswipe.controller.profile.ProfileController;
 import ieti.jobswipe.model.entity.CandidateProfile;
 import ieti.jobswipe.model.entity.CompanyProfile;
 import ieti.jobswipe.model.entity.Profile;
@@ -31,6 +30,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -203,16 +203,27 @@ class ProfileControllerTest {
 
         @Test
         void shouldIgnoreNullsWhenInvalidatingProfileCache() {
-                ReflectionTestUtils.invokeMethod(profileController, "invalidateProfileCache", new Object[] { null });
-                ReflectionTestUtils.invokeMethod(profileController, "invalidateProfileCache", new Object[] { new Long[] { null, 1L } });
+                @SuppressWarnings("unchecked")
+                java.util.Map<Long, Object> cache = (java.util.Map<Long, Object>) ReflectionTestUtils.getField(profileController, "profileResponseCache");
+                cache.put(99L, new Object());
+
+                assertDoesNotThrow(() -> {
+                        ReflectionTestUtils.invokeMethod(profileController, "invalidateProfileCache", new Object[] { null });
+                        ReflectionTestUtils.invokeMethod(profileController, "invalidateProfileCache", new Object[] { new Long[] { null, 1L } });
+                });
+                assertEquals(1, cache.size());
         }
 
         @Test
         void shouldIgnoreNullVarargsWhenInvalidatingProfileCache() throws Exception {
+                @SuppressWarnings("unchecked")
+                java.util.Map<Long, Object> cache = (java.util.Map<Long, Object>) ReflectionTestUtils.getField(profileController, "profileResponseCache");
+                cache.put(77L, new Object());
                 java.lang.reflect.Method method = ProfileController.class.getDeclaredMethod("invalidateProfileCache", Long[].class);
                 method.setAccessible(true);
 
-                method.invoke(profileController, new Object[] { null });
+                assertDoesNotThrow(() -> method.invoke(profileController, new Object[] { null }));
+                assertEquals(1, cache.size());
         }
 
         @Test

@@ -11,7 +11,6 @@ import ieti.jobswipe.dto.vacancy.VacancyApplicantResponse;
 import ieti.jobswipe.dto.vacancy.VacancyDetailResponse;
 import ieti.jobswipe.dto.vacancy.VacancyRecommendationResponse;
 import ieti.jobswipe.dto.vacancy.VacancySummaryResponse;
-import ieti.jobswipe.controller.vacancy.VacancyController;
 import ieti.jobswipe.model.EmploymentType;
 import ieti.jobswipe.model.ExperienceLevel;
 import ieti.jobswipe.model.Modality;
@@ -66,8 +65,6 @@ class VacancyControllerTest {
     private VacancyController vacancyController;
 
     private User testCompany;
-    private Vacancy testVacancy;
-    private Vacancy testVacancy2;
     private CreateVacancyRequest testRequest;
 
     @BeforeEach
@@ -78,32 +75,6 @@ class VacancyControllerTest {
                 .email("company@tech.com")
                 .role(Role.COMPANY)
                 .build();
-
-        testVacancy = Vacancy.builder()
-            .id(1L)
-            .title("Backend Developer")
-            .description("Java + Spring Boot")
-            .location("Bogota, Colombia")
-            .modality(Modality.REMOTE)
-            .employmentType(EmploymentType.FULL_TIME)
-            .experienceLevel(ExperienceLevel.SENIOR)
-            .minSalary(5000.0)
-            .maxSalary(8000.0)
-            .company(testCompany)
-            .build();
-
-        testVacancy2 = Vacancy.builder()
-            .id(2L)
-            .title("Frontend Developer")
-            .description("React + TypeScript")
-            .location("Medellin, Colombia")
-            .modality(Modality.HYBRID)
-            .employmentType(EmploymentType.FULL_TIME)
-            .experienceLevel(ExperienceLevel.SEMI_SENIOR)
-            .minSalary(4000.0)
-            .maxSalary(6000.0)
-            .company(testCompany)
-            .build();
 
         testRequest = new CreateVacancyRequest();
         testRequest.setTitle("Backend Developer");
