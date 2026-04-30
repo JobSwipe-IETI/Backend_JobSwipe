@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.entity.User;
 import ieti.jobswipe.repository.user.UserRepository;
+import ieti.jobswipe.scheduler.MatchingAnalysisScheduler;
    
 
 import java.util.List;
@@ -29,6 +30,9 @@ class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private MatchingAnalysisScheduler matchingAnalysisScheduler;
 
     @InjectMocks
     private UserService userService;
@@ -55,6 +59,23 @@ class UserServiceTest {
         assertEquals("John Doe", createdUser.getName());
         assertEquals("john@example.com", createdUser.getEmail());
         verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    @Test
+    void shouldCreateMatchingAnalysisWhenPremiumUserIsCreated() {
+        User premiumUser = User.builder()
+                .id(2L)
+                .name("Premium User")
+                .email("premium@example.com")
+                .role(Role.CANDIDATE)
+                .isPremium(true)
+                .build();
+        when(userRepository.save(any(User.class))).thenReturn(premiumUser);
+
+        User createdUser = userService.createUser(premiumUser);
+
+        assertNotNull(createdUser);
+        verify(matchingAnalysisScheduler, times(1)).ensureMatchingAnalysisExists(premiumUser);
     }
 
     @Test

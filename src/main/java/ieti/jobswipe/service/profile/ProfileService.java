@@ -11,18 +11,18 @@ import org.springframework.util.StringUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ieti.jobswipe.dto.profile.CandidateProfileRequest;
 import ieti.jobswipe.dto.company.CompanyProfileRequest;
+import ieti.jobswipe.dto.profile.CandidateProfileRequest;
 import ieti.jobswipe.exception.ErrorMessages;
 import ieti.jobswipe.exception.ProfileNotFoundException;
 import ieti.jobswipe.exception.UserNotFoundException;
+import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.entity.CandidateProfile;
 import ieti.jobswipe.model.entity.CompanyProfile;
 import ieti.jobswipe.model.entity.Profile;
-import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.entity.User;
-import ieti.jobswipe.repository.profile.CandidateProfileRepository;
 import ieti.jobswipe.repository.company.CompanyProfileRepository;
+import ieti.jobswipe.repository.profile.CandidateProfileRepository;
 import ieti.jobswipe.repository.profile.ProfileRepository;
 import ieti.jobswipe.repository.user.UserRepository;
 
@@ -37,15 +37,18 @@ public class ProfileService {
     private final CandidateProfileRepository candidateProfileRepository;
     private final CompanyProfileRepository companyProfileRepository;
     private final UserRepository userRepository;
+    private final ProfileFeedbackService profileFeedbackService;
 
     public ProfileService(ProfileRepository profileRepository,
             CandidateProfileRepository candidateProfileRepository,
             CompanyProfileRepository companyProfileRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            ProfileFeedbackService profileFeedbackService) {
         this.profileRepository = profileRepository;
         this.candidateProfileRepository = candidateProfileRepository;
         this.companyProfileRepository = companyProfileRepository;
         this.userRepository = userRepository;
+        this.profileFeedbackService = profileFeedbackService;
     }
 
     @Transactional(readOnly = true)
@@ -106,7 +109,18 @@ public class ProfileService {
 
         candidateProfile = candidateProfileRepository.save(candidateProfile);
         profile.setCandidateProfile(candidateProfile);
-        return profileRepository.save(profile);
+        Profile saved = profileRepository.save(profile);
+
+        // Fire-and-forget analysis: call AI service asynchronously
+        try {
+            logger.info("🔄 Dispatching profile analysis after candidate profile save for userId={} profileId={}",
+                    userId, saved.getId());
+            profileFeedbackService.analyzeAndSaveAsync(saved.getId());
+        } catch (Exception e) {
+            logger.warn("Failed to dispatch profile analysis async: {}", e.getMessage());
+        }
+
+        return saved;
     }
 
     public Profile upsertCompanyProfile(Long userId, CompanyProfileRequest request) {

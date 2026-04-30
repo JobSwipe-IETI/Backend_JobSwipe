@@ -65,6 +65,10 @@ public class User {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "is_premium", nullable = false)
+    @Builder.Default
+    private Boolean isPremium = false;
+
     @PrePersist
     private void onCreate() {
         LocalDateTime now = LocalDateTime.now();

@@ -11,6 +11,7 @@ public record UserDto(
         String googleId,
         String avatarUrl,
         Role role,
+        Boolean isPremium,
         LocalDateTime createdAt,
         LocalDateTime updatedAt) {
 }

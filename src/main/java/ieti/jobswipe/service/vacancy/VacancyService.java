@@ -888,6 +888,37 @@ public class VacancyService {
         return getRecommendedVacanciesWithProgress(userId, minScore, limit, null);
     }
 
+    @Transactional
+    public int warmRecommendationCacheForUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException(ErrorMessages.USER_NOT_FOUND));
+        if (user.getRole() != Role.CANDIDATE) {
+            logger.info("Skipping recommendation cache warmup for non-candidate user: {}", userId);
+            return 0;
+        }
+
+        Set<Long> swipedVacancyIds = new HashSet<>(vacancySwipeRepository.findSwipedVacancyIdsByUserId(userId));
+        List<Vacancy> vacancies = findAvailableVacanciesForUser(userId, swipedVacancyIds);
+        Instant cacheThreshold = Instant.now().minusSeconds(Math.max(60L, recommendationCacheTtlSeconds));
+        LocalDateTime profileUpdatedAt = profileRepository.findUpdatedAtByUserId(userId)
+                .orElseThrow(() -> new RuntimeException(ErrorMessages.PROFILE_NOT_FOUND));
+        int processed = 0;
+
+        for (Vacancy vacancy : vacancies) {
+            evaluateVacancyRecommendation(
+                    vacancy,
+                    userId,
+                    profileUpdatedAt,
+                    cacheThreshold,
+                    swipedVacancyIds,
+                    0f);
+            processed++;
+        }
+
+        logger.info("Warmed recommendation cache for user {} across {} vacancies", userId, processed);
+        return processed;
+    }
+
     public List<VacancyRecommendationResponse> getRecommendedVacanciesWithProgress(
             Long userId,
             Float minScore,
