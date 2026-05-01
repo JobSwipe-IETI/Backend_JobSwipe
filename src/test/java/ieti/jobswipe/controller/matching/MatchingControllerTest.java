@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ieti.jobswipe.dto.matching.MatchingRequest;
 import ieti.jobswipe.dto.matching.MatchingResponse;
+import ieti.jobswipe.model.Role;
+import ieti.jobswipe.model.entity.User;
+import ieti.jobswipe.repository.user.UserRepository;
 import ieti.jobswipe.service.matching.MatchingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +32,9 @@ class MatchingControllerTest {
     @Mock
     private MatchingService matchingService;
 
+        @Mock
+        private UserRepository userRepository;
+
     @InjectMocks
     private MatchingController matchingController;
 
@@ -48,6 +54,14 @@ class MatchingControllerTest {
                 .vacancyId(10L)
                 .build();
 
+        User premiumUser = User.builder()
+                .id(1L)
+                .name("John Doe")
+                .email("john@example.com")
+                .role(Role.CANDIDATE)
+                .isPremium(true)
+                .build();
+
         MatchingResponse response = MatchingResponse.builder()
                 .similarityScore(0.91)
                 .compatibilityPercentage(88.0f)
@@ -56,6 +70,7 @@ class MatchingControllerTest {
                 .usedLlmFeedback(true)
                 .build();
 
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(premiumUser));
         when(matchingService.calculateMatch(1L, 10L)).thenReturn(response);
 
         mockMvc.perform(post("/matching/calculate")
@@ -78,6 +93,15 @@ class MatchingControllerTest {
                 .vacancyId(999L)
                 .build();
 
+        User premiumUser = User.builder()
+                .id(1L)
+                .name("John Doe")
+                .email("john@example.com")
+                .role(Role.CANDIDATE)
+                .isPremium(true)
+                .build();
+
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(premiumUser));
         when(matchingService.calculateMatch(1L, 999L)).thenThrow(new RuntimeException("Profile not found"));
 
         mockMvc.perform(post("/matching/calculate")
@@ -95,6 +119,15 @@ class MatchingControllerTest {
                 .vacancyId(10L)
                 .build();
 
+        User premiumUser = User.builder()
+                .id(1L)
+                .name("John Doe")
+                .email("john@example.com")
+                .role(Role.CANDIDATE)
+                .isPremium(true)
+                .build();
+
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(premiumUser));
         when(matchingService.calculateMatch(1L, 10L)).thenThrow(new RuntimeException("AI service unavailable"));
 
         mockMvc.perform(post("/matching/calculate")

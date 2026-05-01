@@ -33,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -236,6 +237,43 @@ class UserControllerTest {
                 .andExpect(status().isNotFound());
 
         verify(userService, times(1)).deleteUser(999L);
+    }
+
+    @Test
+    void shouldUpdatePremiumStatus() throws Exception {
+        User premiumUser = User.builder()
+                .id(1L)
+                .name("John Doe")
+                .email("john@example.com")
+                .password("password123")
+                .role(Role.CANDIDATE)
+                .isPremium(true)
+                .build();
+
+        when(userService.updateUserPremiumStatus(eq(1L), eq(true))).thenReturn(premiumUser);
+
+        mockMvc.perform(patch("/users/1/premium")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"isPremium\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.isPremium", is(true)))
+                .andExpect(jsonPath("$.role", is("CANDIDATE")));
+
+        verify(userService, times(1)).updateUserPremiumStatus(eq(1L), eq(true));
+    }
+
+    @Test
+    void shouldReturn404WhenUpdatingPremiumStatusForMissingUser() throws Exception {
+        when(userService.updateUserPremiumStatus(eq(999L), eq(true)))
+                .thenThrow(new RuntimeException("User not found"));
+
+        mockMvc.perform(patch("/users/999/premium")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"isPremium\":true}"))
+                .andExpect(status().isNotFound());
+
+        verify(userService, times(1)).updateUserPremiumStatus(eq(999L), eq(true));
     }
 }
 
