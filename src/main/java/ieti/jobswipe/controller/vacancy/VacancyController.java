@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 
 import ieti.jobswipe.dto.company.CompanyCandidateDecisionRequest;
 import ieti.jobswipe.dto.company.CompanyCandidateDecisionResponse;
@@ -348,6 +350,10 @@ public class VacancyController {
         @ApiResponse(responseCode = "400", description = "Invalid data or user is not a company"),
         @ApiResponse(responseCode = "404", description = "Company not found")
     })
+    @Caching(evict = {
+        @CacheEvict(value = "vacancySummariesForUser", key = "#jwt.subject"),
+        @CacheEvict(value = "companyPipeline", key = "#jwt.subject")
+    })
     public ResponseEntity<VacancyDetailResponse> createVacancy(
             @RequestBody CreateVacancyRequest request,
             @AuthenticationPrincipal Jwt jwt) {
@@ -369,6 +375,7 @@ public class VacancyController {
         @ApiResponse(responseCode = "400", description = "Invalid data"),
         @ApiResponse(responseCode = "404", description = "Vacancy not found")
     })
+    @CacheEvict(value = {"vacancySummariesForUser", "companyPipeline"}, allEntries = true)
     public ResponseEntity<VacancyDetailResponse> updateVacancy(
             @PathVariable Long id,
             @RequestBody CreateVacancyRequest request) {

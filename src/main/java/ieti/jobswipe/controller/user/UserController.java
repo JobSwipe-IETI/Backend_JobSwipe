@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -93,6 +94,24 @@ public class UserController {
         }
     }
 
+    @PatchMapping("/{id}/premium")
+    @Operation(summary = "Update user premium status", description = "Toggle premium status for a user")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Premium status updated successfully"),
+        @ApiResponse(responseCode = "404", description = "User not found")
+    })
+    public ResponseEntity<UserDto> updatePremiumStatus(@PathVariable Long id, @RequestBody PremiumStatusRequest request) {
+        try {
+            User updated = userService.updateUserPremiumStatus(id, request.isPremium());
+            return ResponseEntity.ok(toDto(updated));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
+
+    record PremiumStatusRequest(Boolean isPremium) {
+    }
+
     private User toUser(UserRequest userRequest) {
         return User.builder()
                 .name(userRequest.getName())
@@ -112,6 +131,7 @@ public class UserController {
                 user.getGoogleId(),
                 user.getAvatarUrl(),
                 user.getRole(),
+                user.getIsPremium(),
                 user.getCreatedAt(),
                 user.getUpdatedAt());
     }

@@ -136,6 +136,37 @@ public class MatchingService {
         return vacancyStr.isEmpty() ? "No vacancy information available" : vacancyStr;
     }
 
+    /**
+     * Analiza automáticamente los matchings de un usuario con todas las vacantes
+     * Usado por el scheduler de análisis automático para usuarios premium
+     */
+    @Transactional(readOnly = true, noRollbackFor = RuntimeException.class)
+    public void analyzeUserMatches(ieti.jobswipe.model.entity.User user) {
+        logger.info("🚀 Analyzing all vacancies for premium user: {}", user.getId());
+
+        try {
+            Profile profile = profileRepository.findByUserId(user.getId())
+                    .orElseThrow(() -> new ProfileNotFoundException(ErrorMessages.PROFILE_NOT_FOUND));
+
+            java.util.List<Vacancy> allVacancies = vacancyRepository.findAll();
+            logger.info("📊 Found {} vacancies to analyze", allVacancies.size());
+
+            for (Vacancy vacancy : allVacancies) {
+                try {
+                    calculateMatch(user.getId(), vacancy.getId());
+                    logger.debug("✅ Analyzed match for vacancy: {}", vacancy.getId());
+                } catch (Exception e) {
+                    logger.warn("⚠️ Error analyzing vacancy {}: {}", vacancy.getId(), e.getMessage());
+                    // Continue with next vacancy even if one fails
+                }
+            }
+
+            logger.info("✅ Completed analysis for all vacancies for user: {}", user.getId());
+        } catch (Exception e) {
+            logger.error("❌ Error analyzing user matches: {}", e.getMessage(), e);
+        }
+    }
+
     private MatchingResponse callAiService(String candidateText, String vacancyText) {
         try {
             String url = aiServiceBaseUrl + "/embeddings/match";

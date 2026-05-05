@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.entity.User;
 import ieti.jobswipe.repository.user.UserRepository;
+import ieti.jobswipe.scheduler.MatchingAnalysisScheduler;
    
 
 import java.util.List;
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,6 +31,9 @@ class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private MatchingAnalysisScheduler matchingAnalysisScheduler;
 
     @InjectMocks
     private UserService userService;
@@ -55,6 +60,23 @@ class UserServiceTest {
         assertEquals("John Doe", createdUser.getName());
         assertEquals("john@example.com", createdUser.getEmail());
         verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    @Test
+    void shouldCreateMatchingAnalysisWhenPremiumUserIsCreated() {
+        User premiumUser = User.builder()
+                .id(2L)
+                .name("Premium User")
+                .email("premium@example.com")
+                .role(Role.CANDIDATE)
+                .isPremium(true)
+                .build();
+        when(userRepository.save(any(User.class))).thenReturn(premiumUser);
+
+        User createdUser = userService.createUser(premiumUser);
+
+        assertNotNull(createdUser);
+        verify(matchingAnalysisScheduler, times(1)).ensureMatchingAnalysisExists(premiumUser);
     }
 
     @Test
@@ -177,6 +199,63 @@ class UserServiceTest {
         assertEquals("User not found", ex.getMessage());
         verify(userRepository, times(1)).findById(404L);
         verify(userRepository, times(0)).save(any(User.class));
+    }
+
+    @Test
+    void shouldUpdatePremiumStatusAndTriggerMatchingAnalysis() {
+        User premiumCandidate = User.builder()
+                .id(1L)
+                .name("John Doe")
+                .email("john@example.com")
+                .password("password123")
+                .role(Role.CANDIDATE)
+                .isPremium(false)
+                .build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(premiumCandidate));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User updated = userService.updateUserPremiumStatus(1L, true);
+
+        assertEquals(Boolean.TRUE, updated.getIsPremium());
+        verify(userRepository, times(1)).findById(1L);
+        verify(userRepository, times(1)).save(any(User.class));
+        verify(matchingAnalysisScheduler, times(1)).ensureMatchingAnalysisExists(updated);
+    }
+
+    @Test
+    void shouldUpdatePremiumStatusWithoutTriggerWhenNull() {
+        User premiumCandidate = User.builder()
+                .id(2L)
+                .name("Jane Doe")
+                .email("jane@example.com")
+                .password("password456")
+                .role(Role.CANDIDATE)
+                .isPremium(true)
+                .build();
+
+        when(userRepository.findById(2L)).thenReturn(Optional.of(premiumCandidate));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User updated = userService.updateUserPremiumStatus(2L, null);
+
+        assertEquals(Boolean.FALSE, updated.getIsPremium());
+        verify(userRepository, times(1)).findById(2L);
+        verify(userRepository, times(1)).save(any(User.class));
+        verify(matchingAnalysisScheduler, never()).ensureMatchingAnalysisExists(any(User.class));
+    }
+
+    @Test
+    void shouldThrowWhenUpdatingPremiumStatusForNonExistingUser() {
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> userService.updateUserPremiumStatus(999L, true));
+
+        assertEquals("User not found", ex.getMessage());
+        verify(userRepository, times(1)).findById(999L);
+        verify(userRepository, never()).save(any(User.class));
+        verify(matchingAnalysisScheduler, never()).ensureMatchingAnalysisExists(any(User.class));
     }
 }
 

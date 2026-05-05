@@ -2,7 +2,7 @@ package ieti.jobswipe.controller.profile;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-
+import java.util.Map;
 import ieti.jobswipe.dto.company.CompanyProfileRequest;
 import ieti.jobswipe.dto.profile.CandidateExperienceRequest;
 import ieti.jobswipe.dto.profile.CandidateProfileRequest;
@@ -10,8 +10,12 @@ import ieti.jobswipe.dto.profile.ProfileResponse;
 import ieti.jobswipe.model.entity.CandidateProfile;
 import ieti.jobswipe.model.entity.CompanyProfile;
 import ieti.jobswipe.model.entity.Profile;
+import ieti.jobswipe.model.entity.User;
 import ieti.jobswipe.model.Role;
+import ieti.jobswipe.repository.profile.ProfileFeedbackRepository;
+import ieti.jobswipe.repository.user.UserRepository;
 import ieti.jobswipe.service.profile.ProfileService;
+import ieti.jobswipe.service.profile.ProfileFeedbackService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +55,15 @@ class ProfileControllerTest {
 
     @Mock
     private ProfileService profileService;
+
+        @Mock
+        private ProfileFeedbackRepository profileFeedbackRepository;
+
+        @Mock
+        private ProfileFeedbackService profileFeedbackService;
+
+        @Mock
+        private UserRepository userRepository;
 
     @InjectMocks
     private ProfileController profileController;
@@ -335,6 +348,144 @@ class ProfileControllerTest {
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
+
+        @Test
+        void shouldReturnPremiumFeedback() throws Exception {
+                User premiumUser = User.builder()
+                                .id(1L)
+                                .name("John Doe")
+                                .email("john@example.com")
+                                .role(Role.CANDIDATE)
+                                .isPremium(true)
+                                .build();
+                Profile profile = Profile.builder().id(10L).build();
+
+                when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(premiumUser));
+                when(profileService.getProfileByUserId(1L)).thenReturn(profile);
+                when(profileFeedbackRepository.findPayloadByProfileId(10L))
+                                .thenReturn(java.util.Optional.of("{\"score\":0.9,\"summary\":\"Good fit\"}"));
+
+                ResponseEntity<Map<String, Object>> response = profileController.getProfileFeedback(1L);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertEquals(0.9, response.getBody().get("score"));
+                assertEquals("Good fit", response.getBody().get("summary"));
+                verify(profileService, times(1)).getProfileByUserId(1L);
+        }
+
+        @Test
+        void shouldReturnForbiddenForNonPremiumFeedbackAccess() {
+                User nonPremiumUser = User.builder()
+                                .id(2L)
+                                .name("Jane Doe")
+                                .email("jane@example.com")
+                                .role(Role.CANDIDATE)
+                                .isPremium(false)
+                                .build();
+
+                when(userRepository.findById(2L)).thenReturn(java.util.Optional.of(nonPremiumUser));
+
+                ResponseEntity<Map<String, Object>> response = profileController.getProfileFeedback(2L);
+
+                assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+                verify(profileService, never()).getProfileByUserId(any());
+        }
+
+        @Test
+        void shouldReturnNoContentWhenNoFeedbackStored() {
+                User premiumUser = User.builder()
+                                .id(3L)
+                                .name("John Doe")
+                                .email("john@example.com")
+                                .role(Role.CANDIDATE)
+                                .isPremium(true)
+                                .build();
+                Profile profile = Profile.builder().id(11L).build();
+
+                when(userRepository.findById(3L)).thenReturn(java.util.Optional.of(premiumUser));
+                when(profileService.getProfileByUserId(3L)).thenReturn(profile);
+                when(profileFeedbackRepository.findPayloadByProfileId(11L)).thenReturn(java.util.Optional.empty());
+
+                ResponseEntity<Map<String, Object>> response = profileController.getProfileFeedback(3L);
+
+                assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        }
+
+        @Test
+        void shouldReturn404WhenFeedbackUserMissing() {
+                when(userRepository.findById(404L)).thenReturn(java.util.Optional.empty());
+
+                ResponseEntity<Map<String, Object>> response = profileController.getProfileFeedback(404L);
+
+                assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        }
+
+        @Test
+        void shouldReturn500WhenFeedbackJsonIsInvalid() {
+                User premiumUser = User.builder()
+                                .id(4L)
+                                .name("John Doe")
+                                .email("john@example.com")
+                                .role(Role.CANDIDATE)
+                                .isPremium(true)
+                                .build();
+                Profile profile = Profile.builder().id(12L).build();
+
+                when(userRepository.findById(4L)).thenReturn(java.util.Optional.of(premiumUser));
+                when(profileService.getProfileByUserId(4L)).thenReturn(profile);
+                when(profileFeedbackRepository.findPayloadByProfileId(12L)).thenReturn(java.util.Optional.of("not-json"));
+
+                ResponseEntity<Map<String, Object>> response = profileController.getProfileFeedback(4L);
+
+                assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        }
+
+        @Test
+        void shouldTriggerPremiumProfileReanalysis() {
+                User premiumUser = User.builder()
+                                .id(5L)
+                                .name("John Doe")
+                                .email("john@example.com")
+                                .role(Role.CANDIDATE)
+                                .isPremium(true)
+                                .build();
+                Profile profile = Profile.builder().id(15L).build();
+
+                when(userRepository.findById(5L)).thenReturn(java.util.Optional.of(premiumUser));
+                when(profileService.getProfileByUserId(5L)).thenReturn(profile);
+
+                ResponseEntity<Map<String, String>> response = profileController.reAnalyzeProfile(5L);
+
+                assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
+                verify(profileFeedbackService, times(1)).analyzeAndSaveAsync(15L);
+        }
+
+        @Test
+        void shouldReturnForbiddenWhenNonPremiumRequestsReanalysis() {
+                User nonPremiumUser = User.builder()
+                                .id(6L)
+                                .name("Jane Doe")
+                                .email("jane@example.com")
+                                .role(Role.CANDIDATE)
+                                .isPremium(false)
+                                .build();
+
+                when(userRepository.findById(6L)).thenReturn(java.util.Optional.of(nonPremiumUser));
+
+                ResponseEntity<Map<String, String>> response = profileController.reAnalyzeProfile(6L);
+
+                assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+                verify(profileFeedbackService, never()).analyzeAndSaveAsync(any());
+        }
+
+        @Test
+        void shouldReturn404WhenReanalysisUserMissing() {
+                when(userRepository.findById(407L)).thenReturn(java.util.Optional.empty());
+
+                ResponseEntity<Map<String, String>> response = profileController.reAnalyzeProfile(407L);
+
+                assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        }
 
     @Test
     void shouldCreateCompanyProfileUsingJwtClaimsToResolveUser() {

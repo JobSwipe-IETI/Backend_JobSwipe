@@ -10,14 +10,17 @@ import ieti.jobswipe.exception.UserNotFoundException;
 import ieti.jobswipe.model.Role;
 import ieti.jobswipe.model.entity.User;
 import ieti.jobswipe.repository.user.UserRepository;
+import ieti.jobswipe.scheduler.MatchingAnalysisScheduler;
 
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
+    private final MatchingAnalysisScheduler matchingAnalysisScheduler;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, MatchingAnalysisScheduler matchingAnalysisScheduler) {
         this.userRepository = userRepository;
+        this.matchingAnalysisScheduler = matchingAnalysisScheduler;
     }
 
     @Transactional(readOnly = true)
@@ -32,7 +35,11 @@ public class UserService {
     }
 
     public User createUser(User user) {
-        return userRepository.save(user);
+        User created = userRepository.save(user);
+        if (Boolean.TRUE.equals(created.getIsPremium())) {
+            matchingAnalysisScheduler.ensureMatchingAnalysisExists(created);
+        }
+        return created;
     }
 
     public User updateUser(Long id, User user) {
@@ -55,6 +62,22 @@ public class UserService {
                 .orElseThrow(() -> new UserNotFoundException(ErrorMessages.USER_NOT_FOUND));
         user.setRole(role);
         return userRepository.save(user);
+    }
+
+    @Transactional
+    public User updateUserPremiumStatus(Long userId, Boolean isPremium) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(ErrorMessages.USER_NOT_FOUND));
+        
+        user.setIsPremium(isPremium != null ? isPremium : false);
+        User updated = userRepository.save(user);
+        
+        // Ensure MatchingAnalysis record exists if user becomes premium
+        if (updated.getIsPremium()) {
+            matchingAnalysisScheduler.ensureMatchingAnalysisExists(updated);
+        }
+        
+        return updated;
     }
 
     public void deleteUser(Long id) {

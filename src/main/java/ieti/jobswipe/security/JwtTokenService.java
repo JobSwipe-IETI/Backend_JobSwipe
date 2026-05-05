@@ -63,7 +63,8 @@ public class JwtTokenService {
                     .claim("name", user.getName())
                     .claim("role", user.getRole().name())
                     .claim("googleId", user.getGoogleId())
-                    .claim("avatarUrl", user.getAvatarUrl());
+                    .claim("avatarUrl", user.getAvatarUrl())
+                    .claim("isPremium", user.getIsPremium() != null ? user.getIsPremium() : false);
         }
 
         JwtClaimsSet claims = claimsBuilder.build();
