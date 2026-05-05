@@ -14,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -129,6 +130,7 @@ public class ProfileController {
         @ApiResponse(responseCode = "404", description = "User not found"),
         @ApiResponse(responseCode = "400", description = "Invalid request")
     })
+    @CacheEvict(value = "vacancySummariesForUser", key = "#userId", allEntries = false)
     public ResponseEntity<Profile> createCandidateProfile(
             @PathVariable Long userId,
             @Valid @RequestBody CandidateProfileRequest request) {
@@ -149,6 +151,7 @@ public class ProfileController {
         @ApiResponse(responseCode = "404", description = "User/profile not found"),
         @ApiResponse(responseCode = "400", description = "Invalid request")
     })
+    @CacheEvict(value = "vacancySummariesForUser", key = "#userId", allEntries = false)
     public ResponseEntity<Profile> updateCandidateProfile(
             @PathVariable Long userId,
             @Valid @RequestBody CandidateProfileRequest request) {
@@ -170,6 +173,7 @@ public class ProfileController {
         @ApiResponse(responseCode = "404", description = "User not found"),
         @ApiResponse(responseCode = "400", description = "Invalid request")
     })
+    @CacheEvict(value = "vacancySummariesForUser", key = "#userId", allEntries = false)
     public ResponseEntity<Profile> createCompanyProfile(
             @PathVariable Long userId,
             @Valid @RequestBody CompanyProfileRequest request) {
@@ -190,6 +194,7 @@ public class ProfileController {
         @ApiResponse(responseCode = "404", description = "User/profile not found"),
         @ApiResponse(responseCode = "400", description = "Invalid request")
     })
+    @CacheEvict(value = "vacancySummariesForUser", key = "#userId", allEntries = false)
     public ResponseEntity<Profile> updateCompanyProfile(
             @PathVariable Long userId,
             @Valid @RequestBody CompanyProfileRequest request) {
